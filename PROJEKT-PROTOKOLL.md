@@ -107,6 +107,29 @@ Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Köl
 
 **Verifikationsmethode (wichtig bei DNS-Themen):** Lokaler Rechner hatte nach dem Nameserver-Wechsel noch veraltete DNS-Cache-Einträge vom Router — `curl`/`dig` gegen den lokalen Resolver lieferten `ERR_CONNECTION_REFUSED` bzw. leere Antworten, obwohl die Seite längst live war. **Fix:** immer gegen einen öffentlichen Resolver prüfen (`dig @1.1.1.1 novastackstudio.de` bzw. `curl --resolve domain:443:<ip>`), nicht dem lokalen System-Resolver vertrauen, wenn kurz zuvor Nameserver umgestellt wurden.
 
+### Phase 17 — Impressum/Datenschutz + Buchungsformular an Brevo angebunden (11.07.2026)
+**Gewollt:** Die in einer parallelen VS-Code-Claude-Code-Session begonnenen Änderungen (Impressum/Datenschutz-Seiten, Formular-Backend) fertigstellen und live schalten. Nicks Vorgabe für den Formular-Endpoint: **Cloudflare Pages Function** + **Brevo** (EU-Mailversand) für die Benachrichtigungs-Mail an ihn.
+
+**Vorgefunden (aus der VS-Code-Session, von mir übernommen/geprüft, nicht neu geschrieben):**
+- `src/lib/router.tsx` — minimaler Pfad-Router (kein react-router) für `/impressum`, `/datenschutz`, inkl. Client-seitiger Navigation.
+- `src/components/LegalPage.tsx` — vollständige Impressum- und Datenschutz-Texte (echte Adresse/Telefonnummer von Nick: Echternacher Str. 12, 50933 Köln, 0174 9403905), nennt Cloudflare (Hosting) und Brevo (Formular-Mailversand) korrekt als Auftragsverarbeiter, inkl. GA4-Abschnitt.
+- `functions/api/booking.ts` — Formular-Handler im Cloudflare-Pages-Functions-Signaturformat, verschickt Buchungs-/Fragebogen-Mails über die Brevo-REST-API (`api.brevo.com/v3/smtp/email`), liest `BREVO_API_KEY`/`BOOKING_TO`/`SENDER_EMAIL`/`QUESTIONNAIRE_URL` aus `env`.
+- `src/lib/submitBooking.ts` + `questionnaire.ts` auf `/api/booking` als Default-Endpoint umgestellt (statt Mock-Erfolg).
+- Footer/CookieBanner: Impressum-/Datenschutz-Links zeigen jetzt auf echte Routen statt `#`.
+
+**Von mir ergänzt (kritische Lücke):** `functions/api/booking.ts` folgt der **Pages**-Functions-Konvention (datei-basiertes Auto-Routing) — aber dieses Projekt läuft als **Workers**-Projekt (s. Phase 16), das scannt `functions/` nicht automatisch. Ohne Fix wäre `/api/booking` ein reiner 404 gewesen. **Fix:**
+- Neuer Worker-Entry-Point [`worker/index.ts`](worker/index.ts): prüft `url.pathname === "/api/booking"`, ruft dann `onRequestPost` aus `functions/api/booking.ts` direkt auf; alles andere geht an `env.ASSETS.fetch(request)` (Static Assets).
+- `wrangler.toml` erweitert: `main = "worker/index.ts"`, `[assets] binding = "ASSETS"`, `not_found_handling = "single-page-application"` (damit `/impressum` etc. bei Hard-Refresh nicht 404 wirft, sondern `index.html` bekommt und der Client-Router übernimmt). Ersetzt das vorgefundene `public/_redirects` (Pages-Konvention, hier wirkungslos) — Datei entfernt.
+- Lokal per `npx wrangler deploy --dry-run` verifiziert (Worker bündelt sauber, `ASSETS`-Binding erkannt), dann committet und gepusht.
+
+**Live-Verifikation nach Deploy:**
+- `GET/POST https://novastackstudio.de/impressum` → HTTP 200 (SPA-Fallback funktioniert)
+- `POST https://novastackstudio.de/api/booking` → HTTP 500 `{"ok":false,"error":"Server not configured"}` — **erwartet**, bestätigt nur, dass das Routing korrekt beim Worker ankommt (kein 404); der eigentliche Versand fehlt noch den Brevo-API-Key.
+
+**Brevo-Setup (mit Nick durchgeführt):** Account erstellt, Domain `novastackstudio.de` unter Senders/Domains verifiziert (Status „Authenticated"), API-Key generiert. Nick hat in Cloudflare (Workers & Pages → novastack → Settings → **Variables and secrets**, Runtime — nicht Build!) `BREVO_API_KEY`, `BOOKING_TO`, `SENDER_EMAIL` eingetragen.
+
+**Offen (s. auch §4):** Trotz eingetragener Variable liefert `/api/booking` weiterhin „Server not configured" — Ursache noch nicht gefunden (vermutlich Encrypt-Häkchen oder fehlender finaler Save auf Cloudflare-Seite, nicht selbst prüfbar ohne Dashboard-Zugriff). **Nächster Schritt bei Wiederaufnahme:** Screenshot von Nicks aktueller „Variables and secrets"-Ansicht anfordern. `QUESTIONNAIRE_URL` bewusst noch nicht gesetzt (kein Fragebogen-Link vorhanden) — **Nick explizit gebeten, ihn daran zu erinnern**, sobald er einen hat.
+
 ---
 
 ## 3. Architektur-Entscheidungen & Warum (Kurzreferenz)
@@ -129,26 +152,26 @@ Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Köl
 
 ---
 
-## 4. Offene Punkte (Stand 10.07.2026, nach Phase 16)
+## 4. Offene Punkte (Stand 11.07.2026, nach Phase 17)
 
 **Launch-Blocker:**
-1. **Impressum & Datenschutzerklärung** — Links zeigen auf `#`. In DE gesetzlich Pflicht (§ 5 DDG/DSGVO). Auch der Datenschutz-Link im Cookie-Banner zeigt auf `#`. **Hinweis:** Die Datenschutzerklärung muss jetzt auch GA4 nennen (Empfänger Google, Zweck Reichweitenmessung, Rechtsgrundlage Einwilligung über den Cookie-Banner) — nicht vergessen, sobald der Text steht.
-2. **Formular-Versand** — `VITE_BOOKING_ENDPOINT` nicht gesetzt: Anfragen laufen als Mock ins Leere. Ebenso `VITE_QUESTIONNAIRE_ENDPOINT` + Fragebogen-URL/replyTo in `src/lib/questionnaire.ts`. Muss wie die GA-ID als Cloudflare-Build-Umgebungsvariable gesetzt werden (Settings → Build → Variables and secrets), nicht nur lokal in `.env`.
-3. **Telefonnummer** — `+49 221 0000000` ist Platzhalter (`src/components/Footer.tsx`).
-4. **E-Mail `hallo@novastackstudio.de`** — steht überall im Code, ist aber laut Nick noch nicht real eingerichtet (Stand Phase 15). Vor Launch prüfen, dass das Postfach existiert und Mails ankommen. Cloudflare zeigte beim DNS-Setup bereits den Hinweis, dass ein MX-Record fehlt (erwartet, solange kein Postfach existiert) — sobald ein Mail-Anbieter gewählt ist, MX/SPF/DKIM als DNS-Records in Cloudflare (nicht mehr bei INWX!) anlegen.
+1. **Formular-Versand funktioniert technisch, aber `BREVO_API_KEY` wird vom Worker noch nicht erkannt** — POST `/api/booking` liefert weiterhin `{"ok":false,"error":"Server not configured"}` (HTTP 500), obwohl Nick die Variable in Cloudflare unter Settings → Variables and secrets angelegt hat. Routing selbst ist bestätigt korrekt (kein 404). Nächster Schritt: Screenshot von Nicks „Variables and secrets"-Ansicht prüfen — vermutlich Encrypt-Häkchen oder ein fehlender finaler Save. **Bis das nicht grün ist, kommen keine Buchungsanfragen bei Nick an — vor Launch unbedingt mit einer echten Test-Buchung über das Live-Formular verifizieren, nicht nur per curl.**
+2. **Fragebogen-Link `QUESTIONNAIRE_URL` fehlt noch** — Nick explizit gebeten, ihn daran zu erinnern. Sobald er einen Fragebogen (Typeform/Google Forms/eigene Seite/…) hat, den Link als Cloudflare-Variable `QUESTIONNAIRE_URL` (Workers & Pages → novastack → Settings → Variables and secrets, Runtime, kein Secret nötig) eintragen — ohne das versendet `functions/api/booking.ts` bei Fragebogen-Anfragen eine E-Mail ohne Link.
+3. **E-Mail `info@novastackstudio.de`** — steht überall im Code (Impressum, Footer, Brevo-Absender), ist aber noch nicht geprüft, ob das Postfach real eingerichtet ist und ankommende Mails auch gelesen werden. Cloudflare zeigte beim DNS-Setup den Hinweis, dass ein MX-Record fehlt — sobald ein Mail-Anbieter gewählt ist, MX/SPF/DKIM als DNS-Records in **Cloudflare DNS** (nicht mehr INWX) anlegen.
 
-**Erledigt seit letztem Stand (Phase 16):**
-- ~~Hosting/Deploy-Pipeline~~ → live auf Cloudflare Workers, Auto-Deploy bei Git-Push, Details Phase 16.
-- ~~Analytics-Tool wählen~~ → Nick hat sich für **GA4** entschieden, ist eingerichtet und live über das Consent-Gate.
-- ~~Serverseitiger Consent-Nachweis nachfragen~~ → wurde bei der GA4-Einrichtung nicht explizit erneut angesprochen; **noch offen, ob Nick das will** (Architektur in Phase 14 dokumentiert, bisher nicht gebaut).
+**Erledigt seit letztem Stand (Phase 17):**
+- ~~Impressum & Datenschutzerklärung~~ → beide Seiten vollständig geschrieben und live unter `/impressum` und `/datenschutz` (echte Adresse/Telefonnummer von Nick, nennt GA4 + Brevo als Auftragsverarbeiter). Details Phase 17.
+- ~~Telefonnummer-Platzhalter~~ → durch echte Nummer ersetzt (`0174 9403905`).
+- ~~Formular-Versand-Infrastruktur~~ → `/api/booking` läuft als Worker-Route (Brevo-Anbindung), nur der API-Key-Schritt fehlt noch (s. Blocker 1 oben).
+- ~~Serverseitiger Consent-Nachweis nachfragen~~ → weiterhin nicht erneut angesprochen; **noch offen, ob Nick das will** (Architektur in Phase 14 dokumentiert, bisher nicht gebaut).
 
 **Vor/zum Launch:**
-5. **og:image, og:url/canonical, sitemap** — Domain ist jetzt live (`novastackstudio.de`), og:url/canonical können jetzt final gesetzt werden. og:image-Grafik muss noch erstellt werden.
-6. **EN-Texte** sind meine Übersetzung der deutschen Agentur-Texte — falls die Agentur EN liefert, austauschen.
-7. **DNSSEC bei INWX** wurde vor dem Nameserver-Wechsel deaktiviert — falls gewünscht, könnte es künftig über Cloudflare selbst wieder aktiviert werden (optional, kein Blocker).
+4. **og:image, og:url/canonical, sitemap** — Domain ist live, og:url/canonical können jetzt final gesetzt werden. og:image-Grafik muss noch erstellt werden.
+5. **EN-Texte** sind meine Übersetzung der deutschen Agentur-Texte — falls die Agentur EN liefert, austauschen. Die Legal-Pages sind bewusst nur auf Deutsch (EN-Besucher sehen einen Hinweis „aus rechtlichen Gründen auf Deutsch").
+6. **DNSSEC bei INWX** wurde vor dem Nameserver-Wechsel deaktiviert — optional künftig über Cloudflare selbst wieder aktivierbar, kein Blocker.
 
 **Wenn Inhalte da sind:**
-8. Zertifikate + Kundenstimmen in `Proof.tsx` (bewusste „folgt"-Platzhalter).
+7. Zertifikate + Kundenstimmen in `Proof.tsx` (bewusste „folgt"-Platzhalter).
 
 ---
 
