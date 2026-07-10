@@ -1,13 +1,13 @@
 import { useLang } from "../lib/LangContext";
 import { useConsent } from "../lib/ConsentContext";
 import { scrollToId } from "../lib/smoothScroll";
+import { navigate } from "../lib/router";
 import Wordmark from "./Wordmark";
 import LangToggle from "./LangToggle";
 
 const CONTACT = {
-  // Placeholders — swap for NovaStack's real details.
-  email: "hallo@novastackstudio.de",
-  phone: "+49 221 0000000",
+  email: "info@novastackstudio.de",
+  phone: "0174 9403905",
 };
 
 export default function Footer() {
@@ -15,6 +15,18 @@ export default function Footer() {
   const f = t.footer;
   const { reopen } = useConsent();
   const year = new Date().getFullYear();
+
+  // Section links work from any route: on a legal page, go home first, then
+  // smooth-scroll to the section once it has rendered.
+  const goSection = (href: string) => {
+    const id = href.replace(/^#/, "");
+    if (window.location.pathname !== "/") {
+      navigate("/");
+      window.setTimeout(() => scrollToId(id), 60);
+    } else {
+      scrollToId(id);
+    }
+  };
 
   return (
     <footer className="relative mt-[4vh] border-t border-nova-sky/10">
@@ -28,7 +40,7 @@ export default function Footer() {
               </h2>
               <p className="mt-3 max-w-md text-sm text-paper/60">{f.ctaSub}</p>
             </div>
-            <button onClick={() => scrollToId("termin")} className="btn-primary sheen-mask whitespace-nowrap">
+            <button onClick={() => goSection("termin")} className="btn-primary sheen-mask whitespace-nowrap">
               {f.builtFor}
               <span aria-hidden>→</span>
             </button>
@@ -67,7 +79,7 @@ export default function Footer() {
                 {sec.links.map((l) => (
                   <li key={l.label}>
                     <button
-                      onClick={() => scrollToId(l.href)}
+                      onClick={() => goSection(l.href)}
                       className="text-left text-sm text-paper/60 transition-colors hover:text-paper"
                     >
                       {l.label}
@@ -104,7 +116,15 @@ export default function Footer() {
           <p>© {year} NovaStack. {f.rights}</p>
           <div className="flex items-center gap-5">
             {f.legal.map((l) => (
-              <a key={l.label} href={l.href} className="transition-colors hover:text-paper/85">
+              <a
+                key={l.label}
+                href={l.href}
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate(l.href);
+                }}
+                className="transition-colors hover:text-paper/85"
+              >
                 {l.label}
               </a>
             ))}

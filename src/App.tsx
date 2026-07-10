@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { MotionConfig } from "framer-motion";
 import { initSmoothScroll } from "./lib/smoothScroll";
+import { useRoute } from "./lib/router";
 import Nav from "./components/Nav";
 import Hero from "./components/Hero";
 import Philosophy from "./components/Philosophy";
@@ -11,6 +12,7 @@ import Proof from "./components/Proof";
 import Booking from "./components/Booking";
 import Footer from "./components/Footer";
 import CookieBanner from "./components/CookieBanner";
+import LegalPage from "./components/LegalPage";
 
 /** Faint architectural strata + vignette sitting behind all content. */
 function Backdrop() {
@@ -48,7 +50,11 @@ function Backdrop() {
 }
 
 export default function App() {
+  const path = useRoute();
   useEffect(() => initSmoothScroll(), []);
+
+  const legalKind =
+    path === "/impressum" ? "impressum" : path === "/datenschutz" ? "privacy" : null;
 
   return (
     <MotionConfig reducedMotion="user">
@@ -63,19 +69,26 @@ export default function App() {
       <Backdrop />
       <div className="grain" aria-hidden />
 
-      <Nav />
+      {legalKind ? (
+        <LegalPage kind={legalKind} />
+      ) : (
+        <>
+          <Nav />
 
-      <main id="inhalt" className="relative z-10">
-        <Hero />
-        <Philosophy />
-        <Services />
-        <Approach />
-        <About />
-        <Proof />
-        <Booking />
-      </main>
+          <main id="inhalt" className="relative z-10">
+            <Hero />
+            <Philosophy />
+            <Services />
+            <Approach />
+            <About />
+            <Proof />
+            <Booking />
+          </main>
 
-      <Footer />
+          <Footer />
+        </>
+      )}
+
       <CookieBanner />
     </MotionConfig>
   );

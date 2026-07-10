@@ -9,7 +9,9 @@
 
 Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Kölner Digitalstudio von **Nicolas Grandezka**. Primäres Ziel der Seite: Besucher zur Buchung eines unverbindlichen Erstgesprächs bewegen. Drei Leistungen: Webdesign & Wartung · KI-Beratung & Integration (inkl. Prozessoptimierung) · Datenbasiertes Marketing. Deutsch ist die Hauptsprache, Englisch per Toggle. Dunkles Design ist der Marken-Look, helles per Toggle.
 
-**Technik:** React 18 + Vite 5 + TypeScript + Tailwind CSS v3, framer-motion (Animationen), Lenis (Smooth Scroll). Statische Seite ohne Backend — Formulare senden an konfigurierbare Webhooks (noch nicht gesetzt). Ort: `~/Desktop/Cowork Workspace/novastack-site`, Brand-Assets in `~/Desktop/NovaStack`. Dev-Server: Launch-Config `novastack`, Port 5173. Produktions-Build läuft sauber durch (~365 KB JS, 115 KB gzip).
+**Technik:** React 18 + Vite 5 + TypeScript + Tailwind CSS v3, framer-motion (Animationen), Lenis (Smooth Scroll). Statische Seite ohne eigenes Backend — Formulare senden an konfigurierbare Webhooks (noch nicht gesetzt). Ort: `~/Desktop/Cowork Workspace/novastack-site`, Brand-Assets in `~/Desktop/NovaStack`. Dev-Server: Launch-Config `novastack`, Port 5173. Produktions-Build läuft sauber durch (~365 KB JS, 115 KB gzip).
+
+**Live-Betrieb (seit Phase 16):** **[novastackstudio.de](https://novastackstudio.de)** ist live auf **Cloudflare Workers** (Static Assets), Projektname `novastack`. Git-Repo: `https://github.com/grandnick99/NovaStack.git` (Branch `main`), Cloudflare ist per Git-Integration angebunden — **jeder Push auf `main` löst automatisch Build + Deploy aus**. Domain-Registrar bleibt **INWX** (`.de`-Domains lassen sich nicht zu Cloudflare transferieren), DNS läuft vollständig über Cloudflare (Nameserver bei INWX auf `kim.ns.cloudflare.com` / `rommy.ns.cloudflare.com` umgestellt). Google Analytics 4 ist eingerichtet und läuft über das bestehende Consent-Gate (s. Phase 16).
 
 ---
 
@@ -91,6 +93,20 @@ Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Köl
 **Geliefert:** Gegenteil von Phase 10 — Wortmark-SVG: trailing „s"-Glyph (der duplizierte, auf 0.155 skalierte S-Pfad) aus dem `STACK`-Array entfernt, `viewBox` von `1186×204` auf `1091×204` verkleinert (kein Leerraum rechts). Alle Texte/Meta/JSON-LD/aria (DE+EN) in `index.html`, `src/content/i18n.ts`, `src/lib/LangContext.tsx`, `src/components/{Nav,NovaMark,Footer,Wordmark}.tsx`, `src/lib/{submitBooking,questionnaire}.ts` von „NovaStacks" auf „NovaStack" zurückgesetzt. E-Mail überall von `hallo@novastacks.de` auf **`hallo@novastackstudio.de`** geändert (Telefonnummer bleibt Platzhalter, s. §4). Kontrolliert per Rest-Suche: keine „Stacks"-Vorkommen mehr in `src/`, `index.html`, `package.json`.
 **Nicht vergessen, falls wieder rückgängig gemacht werden soll:** Der entfernte „s"-Glyph-Code liegt in der Git-Historie (Phase-10-Commit bzw. vor diesem Edit) — Pfad ist eine reine Kopie des „S" aus „Stack", `x: 1090, k: 0.155`.
 
+### Phase 16 — Hosting-Setup: Git-Repo, Cloudflare Workers, DNS-Umzug, GA4 live (10.07.2026)
+**Gewollt:** Seite unter der neuen Domain live schalten, sobald Nick sie bei INWX registriert hat. Empfehlung eingeholt (Cloudflare Pages/Workers vs. EU-Hoster) → Nick hat sich für **Cloudflare** entschieden (kostenlos, schnell, Git-Auto-Deploy). Zusätzlich: Google Analytics 4 einrichten.
+
+**Geliefert:**
+1. **Lokales Git-Repo initialisiert** (vorher keins vorhanden) — `.gitignore` ergänzt (`node_modules`, `dist`, `*.tsbuildinfo`, `vite.config.js`/`.d.ts`-Build-Artefakte, `.env`).
+2. **GitHub-Repo** `https://github.com/grandnick99/NovaStack.git` von Nick angelegt, ich habe gepusht (Nick musste sich einmalig per Personal-Access-Token authentifizieren — kein SSH-Key/`gh`-CLI auf dem Rechner vorhanden).
+3. **Cloudflare-Projekt `novastack`** als **Workers**-Projekt (nicht klassisches „Pages") über Git-Integration angelegt, Build command `npm run build`.
+4. **Deploy-Bug gefixt:** Cloudflares Auto-Deploy nutzte `npx wrangler deploy` mit automatischer Vite-Plugin-Erkennung, die **Vite 6+ voraussetzt** (Projekt hat 5.4.21) → Fehler „cannot be automatically configured". **Fix:** [`wrangler.toml`](wrangler.toml) mit explizitem `[assets] directory = "dist"` ergänzt — das umgeht die Vite-Auto-Konfiguration komplett, deployt `dist/` als reine Static Assets. Kein Vite-Upgrade nötig.
+5. **DNS-Umzug INWX → Cloudflare:** `.de`-Domains lassen sich nicht zu Cloudflare *transferieren* (Registrar bleibt zwingend bei einem akkreditierten deutschen Registrar) — das ist **kein Cloudflare-Bug**, sondern DENIC-Policy. Lösung: Domain nur als **DNS-Zone** bei Cloudflare hinzufügen (Registrierung bleibt bei INWX). Alte Parking-`A`-Records gelöscht, DNSSEC bei INWX vorsichtshalber deaktiviert (sonst drohte Downtime durch Signatur-Mismatch), Nameserver bei INWX auf `kim.ns.cloudflare.com` / `rommy.ns.cloudflare.com` umgestellt. Custom Domains `novastackstudio.de` + `www.novastackstudio.de` im Workers-Projekt verbunden — beide live mit SSL.
+6. **Google Analytics 4** eingerichtet (Measurement-ID `G-F5R5Q3REQN`). **Wichtig:** NICHT als rohes `<script>`-Tag in `index.html` eingebaut — stattdessen die bereits in Phase 11 gebaute Consent-Gate-Logik (`src/lib/analytics.ts`) genutzt, die GA erst nach Zustimmung im Cookie-Banner lädt. Lokal per Konsolen-Check verifiziert: vor Consent kein Script im DOM, nach „Alle akzeptieren" lädt `gtag.js` sofort mit korrekter ID. ID liegt lokal in `.env` (gitignored) und zusätzlich als Cloudflare-Build-Umgebungsvariable `VITE_GA_MEASUREMENT_ID` im Projekt `novastack` (Settings → Build → Variables and secrets) — **muss dort gesetzt sein**, da Vite Umgebungsvariablen zur Build-Zeit einbäckt, ein reines `.env` lokal reicht für den Live-Build nicht. Live verifiziert: ID steckt im ausgelieferten JS-Bundle auf novastackstudio.de.
+7. **Cloudflare-MCP-Server** auf Nicks Rechner eingerichtet (`claude mcp add --transport http cloudflare https://mcp.cloudflare.com/mcp --scope user`), für zukünftige Sessions mit direktem Cloudflare-API-Zugriff — OAuth-Autorisierung muss noch einmalig in einer interaktiven Session abgeschlossen werden.
+
+**Verifikationsmethode (wichtig bei DNS-Themen):** Lokaler Rechner hatte nach dem Nameserver-Wechsel noch veraltete DNS-Cache-Einträge vom Router — `curl`/`dig` gegen den lokalen Resolver lieferten `ERR_CONNECTION_REFUSED` bzw. leere Antworten, obwohl die Seite längst live war. **Fix:** immer gegen einen öffentlichen Resolver prüfen (`dig @1.1.1.1 novastackstudio.de` bzw. `curl --resolve domain:443:<ip>`), nicht dem lokalen System-Resolver vertrauen, wenn kurz zuvor Nameserver umgestellt wurden.
+
 ---
 
 ## 3. Architektur-Entscheidungen & Warum (Kurzreferenz)
@@ -105,25 +121,31 @@ Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Köl
 | Eigenes Consent-Banner statt CMP | kein externes Script, keine Kosten, Marken-Look, passt zu „keine Abhängigkeit" |
 | Bleed-Muster (negative Margins = Padding) | ein Text-Grid für alles; Box-Kanten ragen bewusst darüber hinaus |
 | 3 Leistungen, nicht 4 | Nicks Entscheidung (keine Haarspalterei); deckungsgleich mit 3-Ebenen-Logo |
-| GA nur als gated Stub | Tool-Entscheidung offen; Consent-Gate funktioniert unabhängig davon |
+| GA4 aktiv, aber nur via Consent-Gate geladen | Kein rohes `<script>`-Tag in `index.html`, sonst wäre die Cookie-Banner-Zusage gebrochen |
+| Cloudflare **Workers** (Static Assets) statt „Pages" | Vom Dashboard so angelegt; `wrangler.toml` mit `[assets] directory = "dist"` umgeht Vite-6-Zwang der Auto-Konfiguration |
+| Domain-Registrierung bleibt bei INWX, nur DNS bei Cloudflare | `.de`-Domains sind bei Cloudflare nicht als Registrar transferierbar (DENIC-Policy) — braucht man auch nicht, DNS-Zone reicht |
 
-**Dateien-Landkarte:** Inhalte/Übersetzungen → `src/content/i18n.ts` · Design-Tokens/Glas → `src/index.css` + `tailwind.config.js` · Consent → `src/lib/ConsentContext.tsx`, `src/lib/analytics.ts`, `src/components/CookieBanner.tsx` · Formular-Versand → `src/lib/submitBooking.ts`, `src/lib/questionnaire.ts` · Wortmark (inkl. „s"-Glyph) → `src/components/Wordmark.tsx` · Smooth Scroll → `src/lib/smoothScroll.ts`.
+**Dateien-Landkarte:** Inhalte/Übersetzungen → `src/content/i18n.ts` · Design-Tokens/Glas → `src/index.css` + `tailwind.config.js` · Consent → `src/lib/ConsentContext.tsx`, `src/lib/analytics.ts`, `src/components/CookieBanner.tsx` · Formular-Versand → `src/lib/submitBooking.ts`, `src/lib/questionnaire.ts` · Wortmark (inkl. „s"-Glyph) → `src/components/Wordmark.tsx` · Smooth Scroll → `src/lib/smoothScroll.ts` · Deploy-Config → `wrangler.toml`.
 
 ---
 
-## 4. Offene Punkte (Stand 10.07.2026)
+## 4. Offene Punkte (Stand 10.07.2026, nach Phase 16)
 
 **Launch-Blocker:**
-1. **Impressum & Datenschutzerklärung** — Links zeigen auf `#`. In DE gesetzlich Pflicht (§ 5 DDG/DSGVO). Auch der Datenschutz-Link im Cookie-Banner zeigt auf `#`.
-2. **Formular-Versand** — `VITE_BOOKING_ENDPOINT` nicht gesetzt (keine `.env`): Anfragen laufen als Mock ins Leere. Ebenso `VITE_QUESTIONNAIRE_ENDPOINT` + Fragebogen-URL/replyTo in `src/lib/questionnaire.ts`.
+1. **Impressum & Datenschutzerklärung** — Links zeigen auf `#`. In DE gesetzlich Pflicht (§ 5 DDG/DSGVO). Auch der Datenschutz-Link im Cookie-Banner zeigt auf `#`. **Hinweis:** Die Datenschutzerklärung muss jetzt auch GA4 nennen (Empfänger Google, Zweck Reichweitenmessung, Rechtsgrundlage Einwilligung über den Cookie-Banner) — nicht vergessen, sobald der Text steht.
+2. **Formular-Versand** — `VITE_BOOKING_ENDPOINT` nicht gesetzt: Anfragen laufen als Mock ins Leere. Ebenso `VITE_QUESTIONNAIRE_ENDPOINT` + Fragebogen-URL/replyTo in `src/lib/questionnaire.ts`. Muss wie die GA-ID als Cloudflare-Build-Umgebungsvariable gesetzt werden (Settings → Build → Variables and secrets), nicht nur lokal in `.env`.
 3. **Telefonnummer** — `+49 221 0000000` ist Platzhalter (`src/components/Footer.tsx`).
-3b. **E-Mail `hallo@novastackstudio.de`** — steht überall im Code, ist aber laut Nick noch nicht real eingerichtet (Stand Phase 15). Vor Launch prüfen, dass das Postfach existiert und Mails ankommen.
+4. **E-Mail `hallo@novastackstudio.de`** — steht überall im Code, ist aber laut Nick noch nicht real eingerichtet (Stand Phase 15). Vor Launch prüfen, dass das Postfach existiert und Mails ankommen. Cloudflare zeigte beim DNS-Setup bereits den Hinweis, dass ein MX-Record fehlt (erwartet, solange kein Postfach existiert) — sobald ein Mail-Anbieter gewählt ist, MX/SPF/DKIM als DNS-Records in Cloudflare (nicht mehr bei INWX!) anlegen.
+
+**Erledigt seit letztem Stand (Phase 16):**
+- ~~Hosting/Deploy-Pipeline~~ → live auf Cloudflare Workers, Auto-Deploy bei Git-Push, Details Phase 16.
+- ~~Analytics-Tool wählen~~ → Nick hat sich für **GA4** entschieden, ist eingerichtet und live über das Consent-Gate.
+- ~~Serverseitiger Consent-Nachweis nachfragen~~ → wurde bei der GA4-Einrichtung nicht explizit erneut angesprochen; **noch offen, ob Nick das will** (Architektur in Phase 14 dokumentiert, bisher nicht gebaut).
 
 **Vor/zum Launch:**
-4. **Beim finalen Pre-Launch-Check aktiv nachfragen** (Nicks expliziter Auftrag): Consent-Nachweis-Logging und/oder Analytics jetzt einbauen? (Architektur in Phase 14.)
-5. **Analytics-Tool wählen** (cookielos vs. GA4) + ggf. `VITE_GA_MEASUREMENT_ID` setzen.
-6. **og:image, og:url/canonical, sitemap** — sobald Domain live ist. og:image-Grafik muss noch erstellt werden.
-7. **EN-Texte** sind meine Übersetzung der deutschen Agentur-Texte — falls die Agentur EN liefert, austauschen.
+5. **og:image, og:url/canonical, sitemap** — Domain ist jetzt live (`novastackstudio.de`), og:url/canonical können jetzt final gesetzt werden. og:image-Grafik muss noch erstellt werden.
+6. **EN-Texte** sind meine Übersetzung der deutschen Agentur-Texte — falls die Agentur EN liefert, austauschen.
+7. **DNSSEC bei INWX** wurde vor dem Nameserver-Wechsel deaktiviert — falls gewünscht, könnte es künftig über Cloudflare selbst wieder aktiviert werden (optional, kein Blocker).
 
 **Wenn Inhalte da sind:**
 8. Zertifikate + Kundenstimmen in `Proof.tsx` (bewusste „folgt"-Platzhalter).
@@ -139,6 +161,14 @@ Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Köl
 → **Verifikation stattdessen per DOM/Computed-Styles**; Screenshots nur als Ergänzung werten. Im echten Browser ist alles korrekt.
 
 **Karten wirken auf Mobile durchsichtig:** Tritt auf, wenn Mobile-Blur deaktiviert ist, aber die `--card-top/--card-bot`-Alphas der Mobile-Media-Query zu niedrig sind. Beide gehören zusammen (aktuell: Blur aus + 0.96–0.98).
+
+**Cloudflare-Deploy schlägt mit „Vite version … cannot be automatically configured" fehl:** Passiert, wenn das Cloudflare-Projekt als **Workers**-Projekt (nicht Pages) angelegt wurde und der Auto-Deploy-Befehl `wrangler deploy` versucht, Vite automatisch als Workers-Plugin zu konfigurieren — das braucht Vite 6+.
+→ **Fix:** `wrangler.toml` im Projekt-Root mit `[assets] directory = "dist"` anlegen (siehe Repo-Root). Das deklariert das Projekt explizit als reine Static-Assets-Bereitstellung und umgeht die Vite-Auto-Erkennung komplett — kein Vite-Upgrade nötig.
+
+**Neue Umgebungsvariable wird im Live-Build nicht wirksam:** Bei Vite werden `VITE_*`-Variablen zur **Build-Zeit** eingebacken, nicht zur Laufzeit gelesen. Ein Eintrag in Cloudflares „Variables and secrets" reicht allein nicht — es braucht danach zwingend einen **neuen Build** (Push auf `main`, oder falls kein Retry-Button sichtbar ist: `git commit --allow-empty -m "trigger rebuild" && git push`).
+
+**DNS/Domain lokal scheinbar nicht erreichbar nach Nameserver-Wechsel:** Der lokale Router-/ISP-DNS-Cache braucht oft länger als die eigentliche globale Propagation. `curl`/`dig` gegen den System-Resolver liefern dann `Could not resolve host` oder Timeouts, obwohl die Seite weltweit schon live ist.
+→ **Verifikation:** gegen einen öffentlichen Resolver prüfen, z. B. `dig @1.1.1.1 novastackstudio.de` oder `curl --resolve novastackstudio.de:443:<ip-aus-dig> https://novastackstudio.de`.
 
 ---
 

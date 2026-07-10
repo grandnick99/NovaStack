@@ -47,7 +47,8 @@ export async function requestQuestionnaire(args: {
 }): Promise<void> {
   const endpoint =
     (import.meta.env.VITE_QUESTIONNAIRE_ENDPOINT as string | undefined) ||
-    (import.meta.env.VITE_BOOKING_ENDPOINT as string | undefined);
+    (import.meta.env.VITE_BOOKING_ENDPOINT as string | undefined) ||
+    "/api/booking";
 
   const payload: QuestionnaireRequest = {
     type: "questionnaire",
@@ -57,14 +58,6 @@ export async function requestQuestionnaire(args: {
     questionnaireUrl: QUESTIONNAIRE.url,
     requestedAt: new Date().toISOString(),
   };
-
-  if (!endpoint) {
-    if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.info("[NovaStack] Questionnaire request (mock — no endpoint set):", payload);
-    }
-    return;
-  }
 
   try {
     await fetch(endpoint, {

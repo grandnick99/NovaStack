@@ -141,6 +141,13 @@ export interface Dict {
     privacyLinkLabel: string;
     footerLink: string;
   };
+  legalPages: {
+    backHome: string;
+    imprintTitle: string;
+    privacyTitle: string;
+    updated: string;
+    germanNotice: string;
+  };
 }
 
 const de: Dict = {
@@ -381,8 +388,8 @@ const de: Dict = {
     location: "Köln, Deutschland",
     rights: "Alle Rechte vorbehalten.",
     legal: [
-      { label: "Impressum", href: "#" },
-      { label: "Datenschutz", href: "#" },
+      { label: "Impressum", href: "/impressum" },
+      { label: "Datenschutz", href: "/datenschutz" },
     ],
     builtFor: "Beratung buchen",
   },
@@ -417,6 +424,13 @@ const de: Dict = {
     alwaysOn: "Immer aktiv",
     privacyLinkLabel: "Datenschutzerklärung",
     footerLink: "Cookie-Einstellungen",
+  },
+  legalPages: {
+    backHome: "Startseite",
+    imprintTitle: "Impressum",
+    privacyTitle: "Datenschutzerklärung",
+    updated: "Stand: Juli 2026",
+    germanNotice: "",
   },
 };
 
@@ -658,8 +672,8 @@ const en: Dict = {
     location: "Cologne, Germany",
     rights: "All rights reserved.",
     legal: [
-      { label: "Imprint", href: "#" },
-      { label: "Privacy", href: "#" },
+      { label: "Imprint", href: "/impressum" },
+      { label: "Privacy", href: "/datenschutz" },
     ],
     builtFor: "Book a consultation",
   },
@@ -694,6 +708,13 @@ const en: Dict = {
     alwaysOn: "Always on",
     privacyLinkLabel: "Privacy policy",
     footerLink: "Cookie preferences",
+  },
+  legalPages: {
+    backHome: "Home",
+    imprintTitle: "Imprint",
+    privacyTitle: "Privacy Policy",
+    updated: "Last updated: July 2026",
+    germanNotice: "For legal reasons, the following legal information is provided in German.",
   },
 };
 

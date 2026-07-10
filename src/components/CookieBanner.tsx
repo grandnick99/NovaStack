@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useLang } from "../lib/LangContext";
 import { useConsent, type ConsentCategory } from "../lib/ConsentContext";
+import { navigate } from "../lib/router";
 import { cx } from "../lib/cx";
 import { EASE } from "../lib/motion";
 
@@ -89,7 +90,14 @@ export default function CookieBanner() {
             <p className="font-display text-lg font-extrabold text-paper">{c.bannerTitle}</p>
             <p className="mt-2 text-pretty text-sm leading-relaxed text-paper/65">
               {c.bannerBody}{" "}
-              <a href="#" className="text-nova-sky underline underline-offset-2 hover:text-nova-mist">
+              <a
+                href="/datenschutz"
+                onClick={(e) => {
+                  e.preventDefault();
+                  navigate("/datenschutz");
+                }}
+                className="text-nova-sky underline underline-offset-2 hover:text-nova-mist"
+              >
                 {c.privacyLinkLabel}
               </a>
             </p>

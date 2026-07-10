@@ -15,29 +15,16 @@ export interface BookingPayload {
 }
 
 /**
- * Sends a booking request.
+ * Sends a booking request to our Cloudflare Pages Function (functions/api/booking.ts),
+ * which forwards it as an email via Brevo. Default endpoint is the same-origin
+ * "/api/booking"; override with VITE_BOOKING_ENDPOINT if ever needed.
  *
- * To connect this to a real inbox / CRM / webhook, set `VITE_BOOKING_ENDPOINT`
- * in a `.env` file to a URL that accepts JSON POSTs, e.g.:
- *   - a Formspree / Formspark / Basin endpoint
- *   - a Make.com / Zapier webhook
- *   - your own API route that emails Nicolas
- *
- * Without an endpoint configured it resolves after a short delay so the flow
- * is fully demonstrable in development.
+ * Note: the endpoint only works on Cloudflare (deploy or `wrangler pages dev`).
+ * A plain `vite dev` has no function runtime, so the request will 404 locally.
  */
 export async function submitBooking(payload: BookingPayload): Promise<void> {
-  const endpoint = import.meta.env.VITE_BOOKING_ENDPOINT as string | undefined;
-
-  if (!endpoint) {
-    // Mock success — replace by configuring VITE_BOOKING_ENDPOINT.
-    if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
-      console.info("[NovaStack] Booking payload (mock — no endpoint set):", payload);
-    }
-    await new Promise((r) => setTimeout(r, 1100));
-    return;
-  }
+  const endpoint =
+    (import.meta.env.VITE_BOOKING_ENDPOINT as string | undefined) || "/api/booking";
 
   const res = await fetch(endpoint, {
     method: "POST",
