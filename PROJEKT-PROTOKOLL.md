@@ -1,7 +1,7 @@
 # NovaStack — Projekt-Protokoll (Black Box)
 
 > Vollständiges Gedächtnis des Projekts: was gewollt war, was gebaut wurde, welche Entscheidungen warum fielen, was offen ist und wie bekannte Probleme behoben werden. Gedacht als Nachschlagewerk, falls später Fragen oder Probleme auftauchen.
-> Stand: 10.07.2026 · Gepflegt von Claude · Bei größeren Meilensteinen fortschreiben.
+> Stand: 11.07.2026 · Gepflegt von Claude · Bei größeren Meilensteinen fortschreiben.
 
 ---
 
@@ -130,6 +130,34 @@ Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Köl
 
 **Offen (s. auch §4):** Trotz eingetragener Variable liefert `/api/booking` weiterhin „Server not configured" — Ursache noch nicht gefunden (vermutlich Encrypt-Häkchen oder fehlender finaler Save auf Cloudflare-Seite, nicht selbst prüfbar ohne Dashboard-Zugriff). **Nächster Schritt bei Wiederaufnahme:** Screenshot von Nicks aktueller „Variables and secrets"-Ansicht anfordern. `QUESTIONNAIRE_URL` bewusst noch nicht gesetzt (kein Fragebogen-Link vorhanden) — **Nick explizit gebeten, ihn daran zu erinnern**, sobald er einen hat.
 
+**Nachtrag noch am selben Tag:** Der Brevo-Key-Bug wurde gefunden und gefixt (falscher Variablen-Bereich, s. §4) — Formular funktioniert seither und ist von Nick per Testmail bestätigt.
+
+### Phase 18 — og:image, Sitemap, serverseitiger Consent-Nachweis (11.07.2026)
+**Gewollt:** Nick wollte die drei zuvor als „vor/zum Launch" markierten Punkte umgesetzt haben: ein OG-Vorschaubild fürs Social-Sharing (Vorgabe: altes Logo im Hintergrund, „NovaStack"-Schriftzug im Vordergrund, „Digital Solutions" als Tagline darunter), eine Sitemap, und den serverseitigen Consent-Nachweis aus Phase 14 — Letzteres mit der Ansage „wenn du mich brauchst sag Bescheid", also so weit wie möglich eigenständig umsetzen.
+
+**Geliefert:**
+- **og-image.png** (1200×630, `public/og-image.png`): per Chrome-Headless-Screenshot einer eigens gebauten HTML-Vorlage erzeugt, die exakt die Hero-Farbverläufe (`radial-gradient`/`linear-gradient` aus `src/index.css`), den NovaMark-Stern samt gestapelten Ebenen (aus `NovaMark.tsx` übernommen, statisch statt animiert) und das Wordmark-SVG (aus `Wordmark.tsx` übernommen) reproduziert — kein separates Design-Tool nötig, 100 % konsistent mit der Live-Seite. `index.html` um `og:image(:width/:height/:type)`, `twitter:image`, `og:url` und `<link rel="canonical">` ergänzt. Dabei nebenbei eine Inkonsistenz gefixt: JSON-LD und der `<noscript>`-Fallback in `index.html` nannten noch die alte `hallo@`-Adresse statt `info@novastackstudio.de` — vereinheitlicht.
+- **sitemap.xml** (`public/sitemap.xml`): listet die drei echten Routen (`/`, `/impressum`, `/datenschutz`), referenziert aus `robots.txt`.
+- **Serverseitiger Consent-Nachweis** (DSGVO Art. 7 Abs. 1): `src/lib/consentLog.ts` feuert bei jeder expliziten Consent-Entscheidung (Hook in `ConsentContext.persist()`) einen `navigator.sendBeacon` an eine neue Route `POST /api/consent-log` (`functions/api/consent-log.ts`, gleiches Dispatch-Muster wie `booking.ts` über `worker/index.ts`). Schreibt Append-only in eine neue Cloudflare-KV-Namespace (`novastack-consent-log`) — nur Consent-Wahl + Zeitstempel, bewusst **keine IP, kein User-Agent, keine Kennung**, 3 Jahre Aufbewahrung (TTL).
+- **KV-Namespace selbst angelegt:** Nick hat einmalig `wrangler login` im Terminal ausgeführt (gleiches Muster wie beim Cloudflare-MCP-Setup), danach konnte ich `wrangler kv namespace create novastack-consent-log` direkt selbst ausführen und die ID in `wrangler.toml` eintragen (`[[kv_namespaces]] binding = "CONSENT_LOG"`) — kein Dashboard-Geklicke nötig.
+- Live verifiziert nach Deploy: `sitemap.xml` (200), `og-image.png` (200, 307 KB, `image/png`), alle og:-Meta-Tags im ausgelieferten HTML, `POST /api/consent-log` → `{"ok":true,"logged":true}`, Eintrag per `wrangler kv key list` in der Datenbank bestätigt.
+
+### Phase 19 — Fragebogen migriert: eigene Seite `/fragebogen` statt externes Tool (11.07.2026, via Cowork)
+**Gewollt:** Nick hatte den ursprünglichen Vorab-Fragebogen als eigenständiges, separat gehostetes HTML+Formspree-Projekt gebaut (`~/Claude/Projects/web questionare/index.html`, 7 Schritte). Er ist jetzt live, nutzt Brevo statt Formspree und wollte den alten Fragebogen ins novastack-Projekt migriert und ins Design-/Versandsystem integriert haben, bereit zum Deploy über Claude Code zusammen mit anderen anstehenden Änderungen.
+
+**Geliefert (noch NICHT deployed — bewusst, s. u.):**
+- `src/content/fragebogen.ts` — alle Fragen/Optionen 1:1 aus dem Original übernommen (Branchenliste, Ziele, Zielgruppe, Design/Stil, Inhalt/Seiten, Technik, Zeitplan), **plus eine neue Frage**: „Sollen die Farben kontrastieren oder harmonieren?" (Logo soll hervorstechen vs. alles im Einklang) im Design-Schritt — auf Nicks Wunsch ergänzt.
+- `src/components/Fragebogen.tsx` — 7-Schritte-Formular als vollwertige Route `/fragebogen`, im bestehenden novastack-Designsystem gebaut (`.glass-lit`, Chips, Field-Pattern, `EASE`-Motion, Fortschrittsbalken) statt eigenem CSS — optisch konsistent mit Buchungsformular und Rest der Seite. Bewusst **nur Deutsch** (wie das Original), nicht ins zweisprachige `i18n.ts`-Wörterbuch aufgenommen (~45 Felder hätten das Wörterbuch stark aufgebläht) — falls später Englisch gewünscht ist, ist `src/content/fragebogen.ts` der Ort für eine `en`-Variante.
+- `functions/api/fragebogen.ts` + Route in `worker/index.ts` (`POST /api/fragebogen`) — Versand über Brevo, exakt gleiches Muster wie `booking.ts`. Nutzt dieselben Umgebungsvariablen (`BREVO_API_KEY`, `SENDER_EMAIL`, `BOOKING_TO`), zusätzlich optional `FRAGEBOGEN_TO` falls die Antworten mal an eine andere Adresse als die Terminanfragen sollen — ohne das Setzen läuft alles an `info@novastackstudio.de` (Nicks Vorgabe: „so ziemlich alles soll über die email laufen").
+- E-Mail enthält sowohl eine lesbare Tabelle aller Antworten als auch — migriert aus dem alten Fragebogen — einen fertig formatierten **Prompt-Block** zum direkten Einfügen in einen Bau-Prompt für das jeweilige Kundenprojekt (war im Original die „KUNDENFEEDBACK-BLOCK"-Funktion).
+- `src/lib/questionnaire.ts`: TODO aufgelöst, `QUESTIONNAIRE.url` zeigt jetzt auf `https://novastackstudio.de/fragebogen`.
+- `src/components/LegalPage.tsx`, Abschnitt 7: um einen Absatz zur direkten Fragebogen-Ausfüllung ergänzt (welche Daten beim Ausfüllen selbst — nicht nur beim Link-Versand — verarbeitet werden), Rechtsgrundlage Art. 6 Abs. 1 lit. b DSGVO.
+- `npm run build` lokal grün (`tsc -b && vite build`), keine TypeScript-Fehler.
+
+**Bewusst NICHT gemacht:** kein `git commit`/`push`, kein `wrangler deploy` — Nick wollte das gesammelt über eine Claude-Code-Session zusammen mit anderen offenen Änderungen live schalten, nicht direkt aus Cowork heraus.
+
+**Vor dem Deploy noch nötig (manueller Cloudflare-Schritt, s. §4):** `QUESTIONNAIRE_URL` als Runtime-Variable auf `https://novastackstudio.de/fragebogen` setzen — das ist die eigentliche Quelle für den Link, den `booking.ts` in die Opt-in-E-Mail schreibt (nicht `QUESTIONNAIRE.url` im Frontend-Code, das ist nur Dokumentation/Payload-Feld).
+
 ---
 
 ## 3. Architektur-Entscheidungen & Warum (Kurzreferenz)
@@ -148,29 +176,32 @@ Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Köl
 | Cloudflare **Workers** (Static Assets) statt „Pages" | Vom Dashboard so angelegt; `wrangler.toml` mit `[assets] directory = "dist"` umgeht Vite-6-Zwang der Auto-Konfiguration |
 | Domain-Registrierung bleibt bei INWX, nur DNS bei Cloudflare | `.de`-Domains sind bei Cloudflare nicht als Registrar transferierbar (DENIC-Policy) — braucht man auch nicht, DNS-Zone reicht |
 
-**Dateien-Landkarte:** Inhalte/Übersetzungen → `src/content/i18n.ts` · Design-Tokens/Glas → `src/index.css` + `tailwind.config.js` · Consent → `src/lib/ConsentContext.tsx`, `src/lib/analytics.ts`, `src/components/CookieBanner.tsx` · Formular-Versand → `src/lib/submitBooking.ts`, `src/lib/questionnaire.ts` · Wortmark (inkl. „s"-Glyph) → `src/components/Wordmark.tsx` · Smooth Scroll → `src/lib/smoothScroll.ts` · Deploy-Config → `wrangler.toml`.
+**Dateien-Landkarte:** Inhalte/Übersetzungen → `src/content/i18n.ts` · Design-Tokens/Glas → `src/index.css` + `tailwind.config.js` · Consent → `src/lib/ConsentContext.tsx`, `src/lib/analytics.ts`, `src/components/CookieBanner.tsx` · Formular-Versand → `src/lib/submitBooking.ts`, `src/lib/questionnaire.ts` · Fragebogen (`/fragebogen`) → `src/content/fragebogen.ts`, `src/components/Fragebogen.tsx`, `src/lib/submitFragebogen.ts`, `functions/api/fragebogen.ts` · Wortmark (inkl. „s"-Glyph) → `src/components/Wordmark.tsx` · Smooth Scroll → `src/lib/smoothScroll.ts` · Deploy-Config → `wrangler.toml`.
 
 ---
 
-## 4. Offene Punkte (Stand 11.07.2026, nach Phase 17)
+## 4. Offene Punkte (Stand 11.07.2026, nach Phase 19)
 
 **Launch-Blocker:**
-1. **Fragebogen-Link `QUESTIONNAIRE_URL` fehlt noch** — Nick explizit gebeten, ihn daran zu erinnern. Sobald er einen Fragebogen (Typeform/Google Forms/eigene Seite/…) hat, den Link als Cloudflare-Variable `QUESTIONNAIRE_URL` eintragen (Workers & Pages → novastack → Settings → **oberer** „Variables and secrets"-Bereich, Type „Text", nicht der „Build"-Bereich!) — ohne das versendet `functions/api/booking.ts` bei Fragebogen-Anfragen eine E-Mail ohne Link.
+1. **Fragebogen fertig gebaut (Phase 19), Deploy + `QUESTIONNAIRE_URL` sind der letzte Schritt.** Sobald deployed:
+   - `QUESTIONNAIRE_URL` als Cloudflare-Variable auf `https://novastackstudio.de/fragebogen` setzen (Workers & Pages → novastack → Settings → **oberer** „Variables and secrets"-Bereich, Type „Text", nicht der „Build"-Bereich!) — ohne das versendet `functions/api/booking.ts` bei Fragebogen-Anfragen weiterhin eine E-Mail ohne Link.
+   - Optional: `FRAGEBOGEN_TO` setzen, falls Fragebogen-Antworten an eine andere Adresse als Terminanfragen sollen (Default: `BOOKING_TO`, aktuell `info@novastackstudio.de`).
+   - Live-Test: `/fragebogen` einmal komplett durchklicken und absenden, prüfen ob die Mail (inkl. Prompt-Block) ankommt.
 
-**Erledigt seit letztem Stand (Phase 17):**
-- ~~Impressum & Datenschutzerklärung~~ → beide Seiten vollständig geschrieben und live unter `/impressum` und `/datenschutz` (echte Adresse/Telefonnummer von Nick, nennt GA4 + Brevo als Auftragsverarbeiter). Details Phase 17.
+**Erledigt seit letztem Stand (Phase 17/18):**
+- ~~Impressum & Datenschutzerklärung~~ → live unter `/impressum` und `/datenschutz`, inkl. Abschnitt zum Fragebogen (Phase 19). Details Phase 17.
 - ~~Telefonnummer-Platzhalter~~ → durch echte Nummer ersetzt (`0174 9403905`).
-- ~~Formular-Versand~~ → **funktioniert und live verifiziert** (11.07.2026): `POST /api/booking` liefert `{"ok":true}`, Testmail über Brevo verschickt und **von Nick im Postfach `info@novastackstudio.de` bestätigt angekommen**. Der Bug war, dass `BREVO_API_KEY`/`SENDER_EMAIL` zuerst im **„Build"**-Variablen-Bereich standen (nur zur Build-Zeit gültig, z. B. für `VITE_*`-Werte) statt im **oberen, seitenweiten „Variables and secrets"-Bereich** (Runtime — das liest der Worker bei jedem Request). Nach Umzug in den richtigen Bereich (Type „Secret" für den API-Key, „Text" für die E-Mail) sofort behoben, kein Redeploy nötig. **Wichtig für künftige Cloudflare-Variablen an diesem Projekt: Build-Bereich = nur `VITE_*`-Werte, oberer Variables-and-secrets-Bereich = alles, was der Worker zur Laufzeit braucht (Brevo-Keys, künftige API-Anbindungen etc.).**
-- ~~E-Mail-Postfach `info@novastackstudio.de` real eingerichtet~~ → bestätigt funktionsfähig (Nick hat die Testmail erhalten). MX/SPF/DKIM müssen also bereits korrekt in Cloudflare DNS stehen (vermutlich vom Mail-Anbieter selbst oder vorher schon gesetzt) — kein offener Punkt mehr.
-- ~~Serverseitiger Consent-Nachweis nachfragen~~ → weiterhin nicht erneut angesprochen; **noch offen, ob Nick das will** (Architektur in Phase 14 dokumentiert, bisher nicht gebaut).
+- ~~Formular-Versand (Buchung)~~ → funktioniert und live verifiziert, Testmail von Nick bestätigt angekommen. Details Phase 17.
+- ~~E-Mail-Postfach `info@novastackstudio.de`~~ → bestätigt funktionsfähig.
+- ~~og:image, og:url/canonical, Sitemap~~ → alle drei live und verifiziert, Details Phase 18.
+- ~~Serverseitiger Consent-Nachweis~~ → gebaut und live verifiziert (KV-Log, kein Dashboard-Zugriff nötig gewesen dank `wrangler login`). Details Phase 18.
 
-**Vor/zum Launch:**
-3. **og:image, og:url/canonical, sitemap** — Domain ist live, og:url/canonical können jetzt final gesetzt werden. og:image-Grafik muss noch erstellt werden.
-4. **EN-Texte** sind meine Übersetzung der deutschen Agentur-Texte — falls die Agentur EN liefert, austauschen. Die Legal-Pages sind bewusst nur auf Deutsch (EN-Besucher sehen einen Hinweis „aus rechtlichen Gründen auf Deutsch").
-5. **DNSSEC bei INWX** wurde vor dem Nameserver-Wechsel deaktiviert — optional künftig über Cloudflare selbst wieder aktivierbar, kein Blocker.
+**Vor/zum Launch (nicht blockierend):**
+2. **EN-Texte** sind meine Übersetzung der deutschen Agentur-Texte — falls die Agentur EN liefert, austauschen. Die Legal-Pages und der Fragebogen sind bewusst nur auf Deutsch (EN-Besucher sehen bei den Legal-Pages einen Hinweis „aus rechtlichen Gründen auf Deutsch").
+3. **DNSSEC bei INWX** wurde vor dem Nameserver-Wechsel deaktiviert — optional künftig über Cloudflare selbst wieder aktivierbar, kein Blocker.
 
 **Wenn Inhalte da sind:**
-6. Zertifikate + Kundenstimmen in `Proof.tsx` (bewusste „folgt"-Platzhalter).
+4. Zertifikate + Kundenstimmen in `Proof.tsx` (bewusste „folgt"-Platzhalter).
 
 ---
 

@@ -10,11 +10,13 @@
  */
 import { onRequestPost as handleBooking } from "../functions/api/booking";
 import { onRequestPost as handleConsentLog } from "../functions/api/consent-log";
+import { onRequestPost as handleFragebogen } from "../functions/api/fragebogen";
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   BREVO_API_KEY: string;
   BOOKING_TO?: string;
+  FRAGEBOGEN_TO?: string;
   SENDER_EMAIL?: string;
   QUESTIONNAIRE_URL?: string;
   CONSENT_LOG?: {
@@ -28,6 +30,10 @@ export default {
 
     if (url.pathname === "/api/booking" && request.method === "POST") {
       return handleBooking({ request, env });
+    }
+
+    if (url.pathname === "/api/fragebogen" && request.method === "POST") {
+      return handleFragebogen({ request, env });
     }
 
     if (url.pathname === "/api/consent-log" && request.method === "POST") {

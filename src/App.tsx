@@ -13,6 +13,7 @@ import Booking from "./components/Booking";
 import Footer from "./components/Footer";
 import CookieBanner from "./components/CookieBanner";
 import LegalPage from "./components/LegalPage";
+import Fragebogen from "./components/Fragebogen";
 
 /** Faint architectural strata + vignette sitting behind all content. */
 function Backdrop() {
@@ -71,6 +72,8 @@ export default function App() {
 
       {legalKind ? (
         <LegalPage kind={legalKind} />
+      ) : path === "/fragebogen" ? (
+        <Fragebogen />
       ) : (
         <>
           <Nav />

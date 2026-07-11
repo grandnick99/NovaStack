@@ -2,29 +2,32 @@
  * Pre-project questionnaire delivery.
  *
  * When a prospective web-design client opts in at the end of the booking flow,
- * we trigger an email containing the questionnaire to the address they entered.
+ * we trigger an email containing the questionnaire link to the address they
+ * entered. The questionnaire itself is now hosted on this site at /fragebogen
+ * (see src/components/Fragebogen.tsx) — migrated from the old, separately
+ * hosted static-HTML + Formspree version.
  *
- * A browser cannot send email directly, so this posts the request to a
- * configurable automation endpoint (Make.com / Zapier / your own API route)
- * which performs the actual send. The booking submission ALSO carries a
- * `wantsQuestionnaire` flag, so a single automation can react to either signal.
+ * A browser cannot send email directly, so this posts the request to our own
+ * Cloudflare Function (functions/api/booking.ts), which sends it via Brevo.
+ * The booking submission ALSO carries a `wantsQuestionnaire` flag, so a
+ * single automation can react to either signal.
  *
- * ┌─ TODO (Nicolas) ──────────────────────────────────────────────────────────┐
- * │ Once you give me the questionnaire details, fill these in:                 │
- * │  • QUESTIONNAIRE.url  → the link recipients should receive                 │
- * │                          (Google Form / Typeform / hosted PDF, …)          │
- * │  • VITE_QUESTIONNAIRE_ENDPOINT (in .env) → webhook that sends the email.    │
- * │     If unset, it falls back to VITE_BOOKING_ENDPOINT.                       │
- * │  • QUESTIONNAIRE.fromName / replyTo are optional metadata the automation    │
- * │     can use as the sender identity.                                        │
- * └────────────────────────────────────────────────────────────────────────────┘
+ * ┌─ Cloudflare Setup ──────────────────────────────────────────────────────┐
+ * │ The actual link text in the email is built server-side from the        │
+ * │ `QUESTIONNAIRE_URL` runtime variable in functions/api/booking.ts        │
+ * │ (Workers & Pages → novastack → Settings → Variables and secrets) —      │
+ * │ NOT from `QUESTIONNAIRE.url` below. Set it to:                          │
+ * │   QUESTIONNAIRE_URL = https://novastackstudio.de/fragebogen             │
+ * │ `QUESTIONNAIRE.url` here is kept as the client-side source of truth     │
+ * │ for the same value (sent along in the payload) and as a fallback if     │
+ * │ booking.ts is ever changed to prefer the client-sent URL.               │
+ * └────────────────────────────────────────────────────────────────────────┘
  */
 export const QUESTIONNAIRE = {
-  /** TODO: the questionnaire link to email the client (provided later). */
-  url: "",
+  url: "https://novastackstudio.de/fragebogen",
   /** Optional sender identity the automation may use. */
   fromName: "NovaStack",
-  replyTo: "",
+  replyTo: "info@novastackstudio.de",
 };
 
 export interface QuestionnaireRequest {
