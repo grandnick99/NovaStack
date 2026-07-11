@@ -6,3 +6,9 @@ main = "worker/index.ts"
 directory = "dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+
+# Append-only server-side consent-proof log (DSGVO Art. 7 Abs. 1), see
+# src/lib/consentLog.ts and functions/api/consent-log.ts.
+[[kv_namespaces]]
+binding = "CONSENT_LOG"
+id = "7114e1d7cd194a02a30bed9fec511622"

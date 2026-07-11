@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { loadGatedScripts } from "./analytics";
+import { logConsentServerSide } from "./consentLog";
 
 export type ConsentCategory = "analytics" | "marketing";
 
@@ -59,6 +60,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     setConsent(next);
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     setPromptOpen(false);
+    logConsentServerSide(next);
   };
 
   const value = useMemo<ConsentState>(

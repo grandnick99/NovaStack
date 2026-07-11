@@ -1,14 +1,15 @@
 /**
  * Worker entry point for the novastack Cloudflare Workers (Static Assets)
- * project. Handles the form API route, then falls through to the static
- * site for everything else.
+ * project. Handles the API routes, then falls through to the static site
+ * for everything else.
  *
- * Note: the form logic itself lives in ../functions/api/booking.ts, written
+ * Note: the route logic itself lives in ../functions/api/*.ts, written
  * against the Cloudflare Pages Functions signature — this project deploys as
- * a Workers project (not Pages, see wrangler.toml), so that file is never
- * auto-routed by Cloudflare. It's imported and dispatched manually below.
+ * a Workers project (not Pages, see wrangler.toml), so those files are never
+ * auto-routed by Cloudflare. They're imported and dispatched manually below.
  */
 import { onRequestPost as handleBooking } from "../functions/api/booking";
+import { onRequestPost as handleConsentLog } from "../functions/api/consent-log";
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -16,6 +17,9 @@ interface Env {
   BOOKING_TO?: string;
   SENDER_EMAIL?: string;
   QUESTIONNAIRE_URL?: string;
+  CONSENT_LOG?: {
+    put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+  };
 }
 
 export default {
@@ -24,6 +28,10 @@ export default {
 
     if (url.pathname === "/api/booking" && request.method === "POST") {
       return handleBooking({ request, env });
+    }
+
+    if (url.pathname === "/api/consent-log" && request.method === "POST") {
+      return handleConsentLog({ request, env });
     }
 
     return env.ASSETS.fetch(request);
