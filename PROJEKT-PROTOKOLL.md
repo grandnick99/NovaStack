@@ -155,23 +155,22 @@ Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Köl
 ## 4. Offene Punkte (Stand 11.07.2026, nach Phase 17)
 
 **Launch-Blocker:**
-1. **Formular-Versand funktioniert technisch, aber `BREVO_API_KEY` wird vom Worker noch nicht erkannt** — POST `/api/booking` liefert weiterhin `{"ok":false,"error":"Server not configured"}` (HTTP 500), obwohl Nick die Variable in Cloudflare unter Settings → Variables and secrets angelegt hat. Routing selbst ist bestätigt korrekt (kein 404). Nächster Schritt: Screenshot von Nicks „Variables and secrets"-Ansicht prüfen — vermutlich Encrypt-Häkchen oder ein fehlender finaler Save. **Bis das nicht grün ist, kommen keine Buchungsanfragen bei Nick an — vor Launch unbedingt mit einer echten Test-Buchung über das Live-Formular verifizieren, nicht nur per curl.**
-2. **Fragebogen-Link `QUESTIONNAIRE_URL` fehlt noch** — Nick explizit gebeten, ihn daran zu erinnern. Sobald er einen Fragebogen (Typeform/Google Forms/eigene Seite/…) hat, den Link als Cloudflare-Variable `QUESTIONNAIRE_URL` (Workers & Pages → novastack → Settings → Variables and secrets, Runtime, kein Secret nötig) eintragen — ohne das versendet `functions/api/booking.ts` bei Fragebogen-Anfragen eine E-Mail ohne Link.
-3. **E-Mail `info@novastackstudio.de`** — steht überall im Code (Impressum, Footer, Brevo-Absender), ist aber noch nicht geprüft, ob das Postfach real eingerichtet ist und ankommende Mails auch gelesen werden. Cloudflare zeigte beim DNS-Setup den Hinweis, dass ein MX-Record fehlt — sobald ein Mail-Anbieter gewählt ist, MX/SPF/DKIM als DNS-Records in **Cloudflare DNS** (nicht mehr INWX) anlegen.
+1. **Fragebogen-Link `QUESTIONNAIRE_URL` fehlt noch** — Nick explizit gebeten, ihn daran zu erinnern. Sobald er einen Fragebogen (Typeform/Google Forms/eigene Seite/…) hat, den Link als Cloudflare-Variable `QUESTIONNAIRE_URL` eintragen (Workers & Pages → novastack → Settings → **oberer** „Variables and secrets"-Bereich, Type „Text", nicht der „Build"-Bereich!) — ohne das versendet `functions/api/booking.ts` bei Fragebogen-Anfragen eine E-Mail ohne Link.
+2. **E-Mail `info@novastackstudio.de`** — steht überall im Code (Impressum, Footer, Brevo-Absender/-Empfänger), ist aber noch nicht geprüft, ob das Postfach real eingerichtet ist und ankommende Mails auch gelesen werden. Cloudflare zeigte beim DNS-Setup den Hinweis, dass ein MX-Record fehlt — sobald ein Mail-Anbieter gewählt ist, MX/SPF/DKIM als DNS-Records in **Cloudflare DNS** (nicht mehr INWX) anlegen.
 
 **Erledigt seit letztem Stand (Phase 17):**
 - ~~Impressum & Datenschutzerklärung~~ → beide Seiten vollständig geschrieben und live unter `/impressum` und `/datenschutz` (echte Adresse/Telefonnummer von Nick, nennt GA4 + Brevo als Auftragsverarbeiter). Details Phase 17.
 - ~~Telefonnummer-Platzhalter~~ → durch echte Nummer ersetzt (`0174 9403905`).
-- ~~Formular-Versand-Infrastruktur~~ → `/api/booking` läuft als Worker-Route (Brevo-Anbindung), nur der API-Key-Schritt fehlt noch (s. Blocker 1 oben).
+- ~~Formular-Versand~~ → **funktioniert und live verifiziert** (11.07.2026): `POST /api/booking` liefert `{"ok":true}`, Testmail über Brevo verschickt. Der Bug war, dass `BREVO_API_KEY`/`SENDER_EMAIL` zuerst im **„Build"**-Variablen-Bereich standen (nur zur Build-Zeit gültig, z. B. für `VITE_*`-Werte) statt im **oberen, seitenweiten „Variables and secrets"-Bereich** (Runtime — das liest der Worker bei jedem Request). Nach Umzug in den richtigen Bereich (Type „Secret" für den API-Key, „Text" für die E-Mail) sofort behoben, kein Redeploy nötig. **Wichtig für künftige Cloudflare-Variablen an diesem Projekt: Build-Bereich = nur `VITE_*`-Werte, oberer Variables-and-secrets-Bereich = alles, was der Worker zur Laufzeit braucht (Brevo-Keys, künftige API-Anbindungen etc.).**
 - ~~Serverseitiger Consent-Nachweis nachfragen~~ → weiterhin nicht erneut angesprochen; **noch offen, ob Nick das will** (Architektur in Phase 14 dokumentiert, bisher nicht gebaut).
 
 **Vor/zum Launch:**
-4. **og:image, og:url/canonical, sitemap** — Domain ist live, og:url/canonical können jetzt final gesetzt werden. og:image-Grafik muss noch erstellt werden.
-5. **EN-Texte** sind meine Übersetzung der deutschen Agentur-Texte — falls die Agentur EN liefert, austauschen. Die Legal-Pages sind bewusst nur auf Deutsch (EN-Besucher sehen einen Hinweis „aus rechtlichen Gründen auf Deutsch").
-6. **DNSSEC bei INWX** wurde vor dem Nameserver-Wechsel deaktiviert — optional künftig über Cloudflare selbst wieder aktivierbar, kein Blocker.
+3. **og:image, og:url/canonical, sitemap** — Domain ist live, og:url/canonical können jetzt final gesetzt werden. og:image-Grafik muss noch erstellt werden.
+4. **EN-Texte** sind meine Übersetzung der deutschen Agentur-Texte — falls die Agentur EN liefert, austauschen. Die Legal-Pages sind bewusst nur auf Deutsch (EN-Besucher sehen einen Hinweis „aus rechtlichen Gründen auf Deutsch").
+5. **DNSSEC bei INWX** wurde vor dem Nameserver-Wechsel deaktiviert — optional künftig über Cloudflare selbst wieder aktivierbar, kein Blocker.
 
 **Wenn Inhalte da sind:**
-7. Zertifikate + Kundenstimmen in `Proof.tsx` (bewusste „folgt"-Platzhalter).
+6. Zertifikate + Kundenstimmen in `Proof.tsx` (bewusste „folgt"-Platzhalter).
 
 ---
 
