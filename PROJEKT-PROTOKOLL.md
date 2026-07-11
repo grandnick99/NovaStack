@@ -142,10 +142,12 @@ Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Köl
 - **KV-Namespace selbst angelegt:** Nick hat einmalig `wrangler login` im Terminal ausgeführt (gleiches Muster wie beim Cloudflare-MCP-Setup), danach konnte ich `wrangler kv namespace create novastack-consent-log` direkt selbst ausführen und die ID in `wrangler.toml` eintragen (`[[kv_namespaces]] binding = "CONSENT_LOG"`) — kein Dashboard-Geklicke nötig.
 - Live verifiziert nach Deploy: `sitemap.xml` (200), `og-image.png` (200, 307 KB, `image/png`), alle og:-Meta-Tags im ausgelieferten HTML, `POST /api/consent-log` → `{"ok":true,"logged":true}`, Eintrag per `wrangler kv key list` in der Datenbank bestätigt.
 
-### Phase 19 — Fragebogen migriert: eigene Seite `/fragebogen` statt externes Tool (11.07.2026, via Cowork)
+### Phase 19 — Fragebogen migriert: eigene Seite `/fragebogen` statt externes Tool (11.07.2026, via Cowork + Claude Code)
 **Gewollt:** Nick hatte den ursprünglichen Vorab-Fragebogen als eigenständiges, separat gehostetes HTML+Formspree-Projekt gebaut (`~/Claude/Projects/web questionare/index.html`, 7 Schritte). Er ist jetzt live, nutzt Brevo statt Formspree und wollte den alten Fragebogen ins novastack-Projekt migriert und ins Design-/Versandsystem integriert haben, bereit zum Deploy über Claude Code zusammen mit anderen anstehenden Änderungen.
 
-**Geliefert (noch NICHT deployed — bewusst, s. u.):**
+**Status: komplett live und Ende-zu-Ende verifiziert (11.07.2026).** Nach dem Deploy den kompletten 7-Schritte-Flow im Browser durchgeklickt (Nova-Automation, echte Klicks/Eingaben, kein synthetischer API-Call): alle Schritte inkl. Chips, Textfelder, Fortschrittsanzeige funktionieren, `POST /api/fragebogen` → `{"ok":true}`, Erfolgs-Screen „Vielen Dank!" korrekt, Testmail „Fragebogen: Testeintrag Verifikation" (inkl. lesbarer Tabelle + Prompt-Block) von Nick im Postfach `info@novastackstudio.de` bestätigt angekommen. `QUESTIONNAIRE_URL` ist von Nick als Runtime-Variable gesetzt — die Buchungs-Opt-in-Mail verlinkt jetzt korrekt auf `/fragebogen`. **Kein offener Punkt mehr aus Phase 19.**
+
+**Geliefert:**
 - `src/content/fragebogen.ts` — alle Fragen/Optionen 1:1 aus dem Original übernommen (Branchenliste, Ziele, Zielgruppe, Design/Stil, Inhalt/Seiten, Technik, Zeitplan), **plus eine neue Frage**: „Sollen die Farben kontrastieren oder harmonieren?" (Logo soll hervorstechen vs. alles im Einklang) im Design-Schritt — auf Nicks Wunsch ergänzt.
 - `src/components/Fragebogen.tsx` — 7-Schritte-Formular als vollwertige Route `/fragebogen`, im bestehenden novastack-Designsystem gebaut (`.glass-lit`, Chips, Field-Pattern, `EASE`-Motion, Fortschrittsbalken) statt eigenem CSS — optisch konsistent mit Buchungsformular und Rest der Seite. Bewusst **nur Deutsch** (wie das Original), nicht ins zweisprachige `i18n.ts`-Wörterbuch aufgenommen (~45 Felder hätten das Wörterbuch stark aufgebläht) — falls später Englisch gewünscht ist, ist `src/content/fragebogen.ts` der Ort für eine `en`-Variante.
 - `functions/api/fragebogen.ts` + Route in `worker/index.ts` (`POST /api/fragebogen`) — Versand über Brevo, exakt gleiches Muster wie `booking.ts`. Nutzt dieselben Umgebungsvariablen (`BREVO_API_KEY`, `SENDER_EMAIL`, `BOOKING_TO`), zusätzlich optional `FRAGEBOGEN_TO` falls die Antworten mal an eine andere Adresse als die Terminanfragen sollen — ohne das Setzen läuft alles an `info@novastackstudio.de` (Nicks Vorgabe: „so ziemlich alles soll über die email laufen").
@@ -154,9 +156,7 @@ Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Köl
 - `src/components/LegalPage.tsx`, Abschnitt 7: um einen Absatz zur direkten Fragebogen-Ausfüllung ergänzt (welche Daten beim Ausfüllen selbst — nicht nur beim Link-Versand — verarbeitet werden), Rechtsgrundlage Art. 6 Abs. 1 lit. b DSGVO.
 - `npm run build` lokal grün (`tsc -b && vite build`), keine TypeScript-Fehler.
 
-**Bewusst NICHT gemacht:** kein `git commit`/`push`, kein `wrangler deploy` — Nick wollte das gesammelt über eine Claude-Code-Session zusammen mit anderen offenen Änderungen live schalten, nicht direkt aus Cowork heraus.
-
-**Vor dem Deploy noch nötig (manueller Cloudflare-Schritt, s. §4):** `QUESTIONNAIRE_URL` als Runtime-Variable auf `https://novastackstudio.de/fragebogen` setzen — das ist die eigentliche Quelle für den Link, den `booking.ts` in die Opt-in-E-Mail schreibt (nicht `QUESTIONNAIRE.url` im Frontend-Code, das ist nur Dokumentation/Payload-Feld).
+**Ursprünglich bewusst nicht gemacht, dann in dieser Session nachgeholt:** Code kam fertig gebaut aus einer parallelen VS-Code-Session (kein `git commit`/`push`, kein Deploy — Nick wollte es gesammelt über Cowork live schalten lassen). Ich habe: `git status`/`diff` gegen die Protokoll-Beschreibung geprüft (alles wie beschrieben vorhanden), lokalen Build + `wrangler deploy --dry-run` verifiziert, committet und gepusht (Cloudflare Auto-Deploy). Danach `QUESTIONNAIRE_URL` als Runtime-Variable von Nick gesetzt und der komplette 7-Schritte-Flow live im Browser durchgeklickt und verifiziert (s. Status-Zeile oben).
 
 ---
 
@@ -182,26 +182,23 @@ Marketing- und Buchungswebsite für **NovaStack** (novastackstudio.de), das Köl
 
 ## 4. Offene Punkte (Stand 11.07.2026, nach Phase 19)
 
-**Launch-Blocker:**
-1. **Fragebogen fertig gebaut (Phase 19), Deploy + `QUESTIONNAIRE_URL` sind der letzte Schritt.** Sobald deployed:
-   - `QUESTIONNAIRE_URL` als Cloudflare-Variable auf `https://novastackstudio.de/fragebogen` setzen (Workers & Pages → novastack → Settings → **oberer** „Variables and secrets"-Bereich, Type „Text", nicht der „Build"-Bereich!) — ohne das versendet `functions/api/booking.ts` bei Fragebogen-Anfragen weiterhin eine E-Mail ohne Link.
-   - Optional: `FRAGEBOGEN_TO` setzen, falls Fragebogen-Antworten an eine andere Adresse als Terminanfragen sollen (Default: `BOOKING_TO`, aktuell `info@novastackstudio.de`).
-   - Live-Test: `/fragebogen` einmal komplett durchklicken und absenden, prüfen ob die Mail (inkl. Prompt-Block) ankommt.
+**Launch-Blocker: keine mehr offen.** 🎉 Alle bekannten rechtlichen/funktionalen Blocker sind erledigt und live verifiziert.
 
-**Erledigt seit letztem Stand (Phase 17/18):**
-- ~~Impressum & Datenschutzerklärung~~ → live unter `/impressum` und `/datenschutz`, inkl. Abschnitt zum Fragebogen (Phase 19). Details Phase 17.
+**Erledigt (Phase 17–19):**
+- ~~Impressum & Datenschutzerklärung~~ → live unter `/impressum` und `/datenschutz`, inkl. Abschnitt zum Fragebogen. Details Phase 17/19.
 - ~~Telefonnummer-Platzhalter~~ → durch echte Nummer ersetzt (`0174 9403905`).
 - ~~Formular-Versand (Buchung)~~ → funktioniert und live verifiziert, Testmail von Nick bestätigt angekommen. Details Phase 17.
 - ~~E-Mail-Postfach `info@novastackstudio.de`~~ → bestätigt funktionsfähig.
-- ~~og:image, og:url/canonical, Sitemap~~ → alle drei live und verifiziert, Details Phase 18.
-- ~~Serverseitiger Consent-Nachweis~~ → gebaut und live verifiziert (KV-Log, kein Dashboard-Zugriff nötig gewesen dank `wrangler login`). Details Phase 18.
+- ~~og:image, og:url/canonical, Sitemap~~ → alle drei live und verifiziert. Details Phase 18.
+- ~~Serverseitiger Consent-Nachweis~~ → gebaut und live verifiziert (KV-Log). Details Phase 18.
+- ~~Fragebogen-Migration `/fragebogen`~~ → komplett live, Ende-zu-Ende durchgeklickt, `QUESTIONNAIRE_URL` gesetzt, Testmail mit Prompt-Block von Nick bestätigt. Details Phase 19.
 
-**Vor/zum Launch (nicht blockierend):**
-2. **EN-Texte** sind meine Übersetzung der deutschen Agentur-Texte — falls die Agentur EN liefert, austauschen. Die Legal-Pages und der Fragebogen sind bewusst nur auf Deutsch (EN-Besucher sehen bei den Legal-Pages einen Hinweis „aus rechtlichen Gründen auf Deutsch").
-3. **DNSSEC bei INWX** wurde vor dem Nameserver-Wechsel deaktiviert — optional künftig über Cloudflare selbst wieder aktivierbar, kein Blocker.
+**Nice-to-have, nicht blockierend:**
+1. **EN-Texte** sind meine Übersetzung der deutschen Agentur-Texte — falls die Agentur EN liefert, austauschen. Die Legal-Pages und der Fragebogen sind bewusst nur auf Deutsch (EN-Besucher sehen bei den Legal-Pages einen Hinweis „aus rechtlichen Gründen auf Deutsch").
+2. **DNSSEC bei INWX** wurde vor dem Nameserver-Wechsel deaktiviert — optional künftig über Cloudflare selbst wieder aktivierbar, kein Blocker.
 
 **Wenn Inhalte da sind:**
-4. Zertifikate + Kundenstimmen in `Proof.tsx` (bewusste „folgt"-Platzhalter).
+3. Zertifikate + Kundenstimmen in `Proof.tsx` (bewusste „folgt"-Platzhalter).
 
 ---
 
