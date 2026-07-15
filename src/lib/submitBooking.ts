@@ -6,7 +6,8 @@ export interface BookingPayload {
   phone: string;
   budget: string;
   date: string;
-  slot: string;
+  callFrom: string;
+  callTo: string;
   message: string;
   /** Web-design prospects can opt in to receive the questionnaire by email. */
   wantsQuestionnaire: boolean;

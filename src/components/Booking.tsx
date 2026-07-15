@@ -15,7 +15,8 @@ interface FormState {
   phone: string;
   budget: string;
   date: string;
-  slot: string;
+  callFrom: string;
+  callTo: string;
   message: string;
   wantsQuestionnaire: boolean;
 }
@@ -28,10 +29,17 @@ const EMPTY: FormState = {
   phone: "",
   budget: "",
   date: "",
-  slot: "",
+  callFrom: "08:00",
+  callTo: "19:00",
   message: "",
   wantsQuestionnaire: false,
 };
+
+/** Nick is reachable between 8 and 19 Uhr — hourly slots for the callback window. */
+const CALL_HOURS = Array.from({ length: 12 }, (_, i) => {
+  const h = String(8 + i).padStart(2, "0");
+  return `${h}:00`;
+});
 
 const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
@@ -350,12 +358,40 @@ export default function Booking() {
                             />
                           </Field>
                           <Field label={b.fields.slot}>
-                            <div className="flex flex-wrap gap-2">
-                              {b.slotOptions.map((opt) => (
-                                <Chip key={opt} active={form.slot === opt} onClick={() => set("slot", opt)}>
-                                  {opt}
-                                </Chip>
-                              ))}
+                            <div className="flex items-center gap-3">
+                              <label className="flex-1">
+                                <span className="mb-1.5 block font-grotesk text-[11px] text-paper/50">
+                                  {b.fields.callFrom}
+                                </span>
+                                <select
+                                  className={cx(inputCls, "cursor-pointer appearance-none")}
+                                  value={form.callFrom}
+                                  onChange={(e) => set("callFrom", e.target.value)}
+                                >
+                                  {CALL_HOURS.filter((h) => h < form.callTo).map((h) => (
+                                    <option key={h} value={h}>
+                                      {h}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <span className="mt-5 flex-none text-paper/40">–</span>
+                              <label className="flex-1">
+                                <span className="mb-1.5 block font-grotesk text-[11px] text-paper/50">
+                                  {b.fields.callTo}
+                                </span>
+                                <select
+                                  className={cx(inputCls, "cursor-pointer appearance-none")}
+                                  value={form.callTo}
+                                  onChange={(e) => set("callTo", e.target.value)}
+                                >
+                                  {CALL_HOURS.filter((h) => h > form.callFrom).map((h) => (
+                                    <option key={h} value={h}>
+                                      {h}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
                             </div>
                           </Field>
                           <Field label={b.fields.message} htmlFor="bk-message">
@@ -513,7 +549,10 @@ function ReviewPanel({ form }: { form: FormState }) {
     { label: b.fields.phone, value: form.phone },
     { label: b.fields.budget, value: form.budget },
     { label: b.fields.date, value: form.date },
-    { label: b.fields.slot, value: form.slot },
+    {
+      label: b.fields.slot,
+      value: form.callFrom && form.callTo ? `${form.callFrom} – ${form.callTo}` : "",
+    },
   ].filter((r) => r.value.trim() !== "");
 
   return (
@@ -538,6 +577,29 @@ function ReviewPanel({ form }: { form: FormState }) {
   );
 }
 
+/** 8 little sparks bursting outward before the checkmark settles in. */
+function HappyBurst() {
+  const sparks = Array.from({ length: 8 }, (_, i) => i);
+  return (
+    <>
+      {sparks.map((i) => {
+        const angle = (i / sparks.length) * Math.PI * 2;
+        const dx = Math.cos(angle) * 36;
+        const dy = Math.sin(angle) * 36;
+        return (
+          <motion.span
+            key={i}
+            className="absolute h-1.5 w-1.5 rounded-full bg-[#4ade80]"
+            initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+            animate={{ x: dx, y: dy, opacity: 0, scale: 0.4 }}
+            transition={{ duration: 0.6, delay: 0.05, ease: "easeOut" }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 function SuccessPanel({
   onReset,
   questionnaireSent,
@@ -554,17 +616,23 @@ function SuccessPanel({
       transition={{ duration: 0.5, ease: EASE }}
       className="flex flex-col items-center py-8 text-center"
     >
-      <motion.div
-        initial={{ scale: 0, rotate: -20 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ delay: 0.1, type: "spring", stiffness: 200, damping: 14 }}
-        className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-b from-nova-mist to-nova-sky text-2xl text-ink-900"
-      >
-        ✓
-      </motion.div>
+      <div className="relative flex h-16 w-16 items-center justify-center">
+        <HappyBurst />
+        <motion.div
+          initial={{ scale: 0, rotate: -20 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ delay: 0.35, type: "spring", stiffness: 220, damping: 14 }}
+          className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-b from-[#6ee7b7] to-[#22c55e] text-2xl text-ink-900"
+        >
+          ✓
+        </motion.div>
+      </div>
       <h3 className="mt-6 max-w-sm font-display text-2xl font-extrabold text-paper">
         {b.successTitle}
       </h3>
+      <p className="mt-1.5 max-w-sm text-pretty text-base font-medium leading-snug text-paper/75">
+        {b.successSubtitle}
+      </p>
       <p className="mt-3 max-w-sm text-pretty text-sm leading-relaxed text-paper/60">
         {b.successBody}
       </p>

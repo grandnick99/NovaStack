@@ -90,12 +90,13 @@ export interface Dict {
       budget: string;
       date: string;
       slot: string;
+      callFrom: string;
+      callTo: string;
       message: string;
       messagePlaceholder: string;
     };
     serviceOptions: { key: string; label: string; desc: string }[];
     budgetOptions: string[];
-    slotOptions: string[];
     next: string;
     back: string;
     submit: string;
@@ -103,6 +104,7 @@ export interface Dict {
     reassurance: string;
     review: string;
     successTitle: string;
+    successSubtitle: string;
     successBody: string;
     successAgain: string;
     required: string;
@@ -240,7 +242,7 @@ const de: Dict = {
     },
   ],
   approach: {
-    label: "Vorgehen",
+    label: "Ablauf",
     title: "Wie aus einem Auftrag ein System wird.",
     sub: "Keine endlosen Meetings. Vier klare Schritte, an deren Ende ein funktionierendes System steht.",
     steps: [
@@ -332,7 +334,9 @@ const de: Dict = {
       phoneOptional: "optional",
       budget: "Budgetrahmen",
       date: "Wunschtermin",
-      slot: "Tageszeit",
+      slot: "Rückruf zwischen",
+      callFrom: "Von",
+      callTo: "Bis",
       message: "Worum geht es genau?",
       messagePlaceholder: "Erzählen Sie uns in zwei, drei Sätzen, was Sie vorhaben.",
     },
@@ -343,14 +347,14 @@ const de: Dict = {
       { key: "all", label: "Noch unklar", desc: "Wir finden es gemeinsam heraus" },
     ],
     budgetOptions: ["< 5.000 €", "5.000 bis 15.000 €", "15.000 bis 40.000 €", "> 40.000 €", "Noch offen"],
-    slotOptions: ["Vormittags", "Mittags", "Nachmittags", "Flexibel"],
     next: "Weiter",
     back: "Zurück",
     submit: "Anfrage absenden",
     submitting: "Wird gesendet …",
     reassurance: "Unverbindlich · Persönliche Antwort in unter 24 Stunden",
     review: "Ihre Angaben",
-    successTitle: "Vielen Dank, Ihre Anfrage ist eingegangen.",
+    successTitle: "Vielen Dank!",
+    successSubtitle: "Ihr Auftrag ist eingegangen",
     successBody: "Nicolas meldet sich persönlich innerhalb von 24 Stunden bei Ihnen. Prüfen Sie kurz Ihr Postfach.",
     successAgain: "Neue Anfrage",
     required: "Bitte ausfüllen",
@@ -379,7 +383,7 @@ const de: Dict = {
         heading: "Studio",
         links: [
           { label: "Über uns", href: "#studio" },
-          { label: "Vorgehen", href: "#arbeitsweise" },
+          { label: "Ablauf", href: "#arbeitsweise" },
           { label: "Referenzen", href: "#referenzen" },
         ],
       },
@@ -616,7 +620,9 @@ const en: Dict = {
       phoneOptional: "optional",
       budget: "Budget range",
       date: "Preferred date",
-      slot: "Time of day",
+      slot: "Call back between",
+      callFrom: "From",
+      callTo: "To",
       message: "What exactly is it about?",
       messagePlaceholder: "Tell us in two or three sentences what you have in mind.",
     },
@@ -627,14 +633,14 @@ const en: Dict = {
       { key: "all", label: "Not sure yet", desc: "We'll figure it out together" },
     ],
     budgetOptions: ["< €5,000", "€5,000 to €15,000", "€15,000 to €40,000", "> €40,000", "Still open"],
-    slotOptions: ["Morning", "Midday", "Afternoon", "Flexible"],
     next: "Continue",
     back: "Back",
     submit: "Send request",
     submitting: "Sending …",
     reassurance: "No obligation · Personal reply within 24 hours",
     review: "Your details",
-    successTitle: "Thank you, your request has reached us.",
+    successTitle: "Thank you!",
+    successSubtitle: "Your request has been received",
     successBody: "Nicolas will personally get back to you within 24 hours. Keep an eye on your inbox.",
     successAgain: "New request",
     required: "Please fill this in",

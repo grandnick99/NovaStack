@@ -11,6 +11,7 @@
 import { onRequestPost as handleBooking } from "../functions/api/booking";
 import { onRequestPost as handleConsentLog } from "../functions/api/consent-log";
 import { onRequestPost as handleFragebogen } from "../functions/api/fragebogen";
+import { onRequestGet as handleLeadwerkPending } from "../functions/api/leadwerk-pending";
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -19,8 +20,14 @@ interface Env {
   FRAGEBOGEN_TO?: string;
   SENDER_EMAIL?: string;
   QUESTIONNAIRE_URL?: string;
+  LEADWERK_API_KEY?: string;
   CONSENT_LOG?: {
     put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+  };
+  LEADWERK_QUEUE?: {
+    put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+    list(options?: { prefix?: string; limit?: number }): Promise<{ keys: { name: string }[] }>;
+    get(key: string): Promise<string | null>;
   };
 }
 
@@ -34,6 +41,10 @@ export default {
 
     if (url.pathname === "/api/fragebogen" && request.method === "POST") {
       return handleFragebogen({ request, env });
+    }
+
+    if (url.pathname === "/api/leadwerk/pending" && request.method === "GET") {
+      return handleLeadwerkPending({ request, env });
     }
 
     if (url.pathname === "/api/consent-log" && request.method === "POST") {

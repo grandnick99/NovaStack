@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { navigate } from "../lib/router";
 import { cx } from "../lib/cx";
@@ -6,33 +6,25 @@ import { EASE } from "../lib/motion";
 import Wordmark from "./Wordmark";
 import ThemeToggle from "./ThemeToggle";
 import Footer from "./Footer";
-import { submitFragebogen, type FragebogenPayload } from "../lib/submitFragebogen";
+import { submitFragebogen, type FragebogenPayload, type FragebogenAttachment } from "../lib/submitFragebogen";
 import {
   BRANCHEN,
   GOALS,
   EXISTING_WEB,
   KUNDTYP,
-  CHANNELS,
-  FEELINGS,
-  COLOR_MODE,
-  PAGES,
-  HAVE,
-  LANGS,
-  FEATURES,
-  DOMAIN,
-  TIMELINE,
-  SELFMGMT,
   STEP_TITLES,
   STEP_BADGES,
   TOTAL_STEPS,
+  MAX_UPLOAD_MB,
   type ChipOption,
 } from "../content/fragebogen";
 
 /**
- * Vorab-Fragebogen für Webdesign-Interessenten — eigenständige Seite unter
- * /fragebogen. Migriert aus dem alten, separat gehosteten Fragebogen
- * (statisches HTML + Formspree) in dieses Projekt, im novastack-Designsystem
- * und mit Versand über Brevo statt Formspree (siehe functions/api/fragebogen.ts).
+ * Kurzer, komplett unverbindlicher Vorab-Fragebogen für Webdesign-Interessenten
+ * — eigenständige Seite unter /fragebogen. Ersetzt keine Beratung: die Details
+ * werden im persönlichen Gespräch geklärt. Zweck ist, dass sich Interessenten
+ * nach der Terminbuchung schon eingebunden fühlen und Nick vorab ein grobes
+ * Bild bekommt — daher bewusst kurz (3 Schritte statt der früheren 7).
  *
  * Aufgerufen wird die Seite über den Link, den Interessenten optional am Ende
  * der Terminanfrage per E-Mail bekommen (src/lib/questionnaire.ts) — sie
@@ -41,79 +33,23 @@ import {
 
 interface FormState {
   name: string;
-  was: string;
   branche: string;
   besonders: string;
   goals: string[];
-  goalsOther: string;
-  cta: string;
+  kundtyp: string;
   existingWeb: string;
   oldUrl: string;
-  zielgruppe: string;
-  kundtyp: string;
-  problem: string;
-  channels: string[];
-  feelings: string[];
-  color1: string;
-  color1Hex: string;
-  color2: string;
-  color2Hex: string;
-  colorMode: string;
-  inspo: string;
-  noDesign: string;
-  pages: string[];
-  have: string[];
-  langs: string[];
-  features: string[];
-  domain: string;
-  domainWish: string;
-  competitors: string;
-  timeline: string;
-  anlass: string;
-  selfmgmt: string;
-  email: string;
-  phone: string;
-  extras: string;
 }
 
 const EMPTY: FormState = {
   name: "",
-  was: "",
   branche: "",
   besonders: "",
   goals: [],
-  goalsOther: "",
-  cta: "",
+  kundtyp: "",
   existingWeb: "",
   oldUrl: "",
-  zielgruppe: "",
-  kundtyp: "",
-  problem: "",
-  channels: [],
-  feelings: [],
-  color1: "#68a1eb",
-  color1Hex: "",
-  color2: "#f5f3ff",
-  color2Hex: "",
-  colorMode: "",
-  inspo: "",
-  noDesign: "",
-  pages: [],
-  have: [],
-  langs: [],
-  features: [],
-  domain: "",
-  domainWish: "",
-  competitors: "",
-  timeline: "",
-  anlass: "",
-  selfmgmt: "",
-  email: "",
-  phone: "",
-  extras: "",
 };
-
-const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
 const inputCls =
   "w-full rounded-xl border border-nova-sky/15 bg-nova-ink/40 px-4 py-3 font-sans text-[15px] text-paper placeholder:text-paper/30 outline-none transition-colors duration-200 focus:border-nova-sky/50 focus:bg-nova-ink/60";
@@ -216,41 +152,7 @@ function RadioGroup({
   );
 }
 
-function FeelingGrid({
-  value,
-  onChange,
-}: {
-  value: string[];
-  onChange: (next: string[]) => void;
-}) {
-  return (
-    <div className="grid gap-2.5 sm:grid-cols-2">
-      {FEELINGS.map((opt) => {
-        const on = value.includes(opt.value);
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            aria-pressed={on}
-            onClick={() =>
-              onChange(on ? value.filter((v) => v !== opt.value) : [...value, opt.value])
-            }
-            className={cx(
-              "rounded-2xl border px-4 py-3 text-left font-grotesk text-sm font-medium transition-all duration-200",
-              on
-                ? "border-nova-sky/60 bg-nova-sky/[0.1] text-paper"
-                : "border-nova-sky/15 bg-nova-ink/30 text-paper/70 hover:border-nova-sky/35",
-            )}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Freitext-Eingabe mit Vorschlagsliste, ersetzt das alte Custom-Autocomplete. */
+/** Freitext-Eingabe mit Vorschlagsliste für die Branche. */
 function BrancheInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const q = value.toLowerCase().trim();
@@ -288,39 +190,91 @@ function BrancheInput({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
-function ColorField({
-  label,
-  color,
-  hex,
-  onColor,
-  onHex,
+const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml", "application/pdf"];
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Datei-Upload fürs Logo o.Ä. — komplett optional. */
+function UploadField({
+  attachment,
+  onChange,
 }: {
-  label: string;
-  color: string;
-  hex: string;
-  onColor: (v: string) => void;
-  onHex: (v: string) => void;
+  attachment: FragebogenAttachment | null;
+  onChange: (a: FragebogenAttachment | null) => void;
 }) {
-  return (
-    <Field label={label}>
-      <div className="flex items-center gap-3">
-        <input
-          type="color"
-          value={color}
-          onChange={(e) => {
-            onColor(e.target.value);
-            onHex(e.target.value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const handleFile = async (file: File | undefined) => {
+    setError("");
+    if (!file) return;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError("Bitte ein Bild (PNG, JPG, WEBP, SVG) oder PDF hochladen.");
+      return;
+    }
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      setError(`Datei ist zu groß (max. ${MAX_UPLOAD_MB} MB).`);
+      return;
+    }
+    setBusy(true);
+    try {
+      const base64 = await fileToBase64(file);
+      onChange({ name: file.name, type: file.type, base64 });
+    } catch {
+      setError("Datei konnte nicht gelesen werden. Bitte erneut versuchen.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (attachment) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-nova-sky/15 bg-nova-ink/40 px-4 py-3">
+        <span className="truncate font-sans text-sm text-paper/85">📎 {attachment.name}</span>
+        <button
+          type="button"
+          onClick={() => {
+            onChange(null);
+            if (inputRef.current) inputRef.current.value = "";
           }}
-          className="h-12 w-12 flex-none cursor-pointer rounded-xl border border-nova-sky/15 bg-nova-ink/40 p-0.5"
-        />
-        <input
-          className={inputCls}
-          value={hex}
-          onChange={(e) => onHex(e.target.value)}
-          placeholder="z.B. #4f46e5 oder 'Navy Blau'"
-        />
+          className="flex-none font-grotesk text-xs text-paper/50 underline underline-offset-2 hover:text-paper/80"
+        >
+          Entfernen
+        </button>
       </div>
-    </Field>
+    );
+  }
+
+  return (
+    <div>
+      <label
+        className={cx(
+          "flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-nova-sky/25 bg-nova-ink/30 px-4 py-5 text-center font-grotesk text-sm text-paper/60 transition-colors duration-200 hover:border-nova-sky/45 hover:text-paper/80",
+          busy && "pointer-events-none opacity-60",
+        )}
+      >
+        {busy ? "Wird geladen …" : "📎 Datei auswählen (Logo, Bilder, PDF …)"}
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ALLOWED_TYPES.join(",")}
+          className="hidden"
+          onChange={(e) => handleFile(e.target.files?.[0])}
+        />
+      </label>
+      {error && <span className="mt-1.5 block text-xs text-[#ff9a9a]">{error}</span>}
+    </div>
   );
 }
 
@@ -328,7 +282,7 @@ export default function Fragebogen() {
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
   const [form, setForm] = useState<FormState>(EMPTY);
-  const [emailError, setEmailError] = useState("");
+  const [attachment, setAttachment] = useState<FragebogenAttachment | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [sendState, setSendState] = useState<"pending" | "ok" | "error">("pending");
@@ -348,17 +302,11 @@ export default function Fragebogen() {
   };
 
   const submit = async () => {
-    if (form.email.trim() && !emailOk(form.email)) {
-      setEmailError("Das sieht nicht nach einer gültigen E-Mail-Adresse aus.");
-      setDir(-1);
-      setStep(TOTAL_STEPS - 1);
-      return;
-    }
-    setEmailError("");
     setSubmitting(true);
 
     const payload: FragebogenPayload = {
       ...form,
+      attachment,
       submittedAt: new Date().toISOString(),
     };
 
@@ -401,12 +349,13 @@ export default function Fragebogen() {
         <div className="mx-auto max-w-2xl">
           {!done && (
             <div className="mb-8 text-center">
-              <p className="label justify-center">Vorab-Fragebogen</p>
+              <p className="label justify-center">Vorab-Fragebogen · komplett unverbindlich</p>
               <h1 className="mt-4 font-display text-3xl font-extrabold leading-[1.05] tracking-tight text-paper md:text-4xl">
-                Deine neue Website
+                Ein paar kurze Fragen
               </h1>
               <p className="mx-auto mt-4 max-w-md text-pretty text-base leading-relaxed text-paper/60">
-                Beantworte kurz diese Fragen — damit wir genau das bauen, was du brauchst.
+                Kein Muss — das hier ersetzt kein Gespräch. Es hilft mir nur, mir vorab ein grobes
+                Bild zu machen. Alles Weitere besprechen wir gemeinsam im Termin.
               </p>
             </div>
           )}
@@ -447,7 +396,7 @@ export default function Fragebogen() {
                   >
                     {step === 0 && (
                       <div>
-                        <Field label="Name des Unternehmens / der Person">
+                        <Field label="Name des Unternehmens / der Person" hint="optional">
                           <input
                             className={inputCls}
                             value={form.name}
@@ -455,18 +404,13 @@ export default function Fragebogen() {
                             placeholder="z.B. Müller Schreinerei oder Anna Müller Photography"
                           />
                         </Field>
-                        <Field label="Was machst du?" hint="In einem Satz">
-                          <textarea
-                            className={textareaCls}
-                            value={form.was}
-                            onChange={(e) => set("was", e.target.value)}
-                            placeholder="z.B. Wir verkaufen handgefertigte Möbel aus regionalen Hölzern an Privatkunden in Bayern."
-                          />
-                        </Field>
-                        <Field label="Branche">
+                        <Field label="Branche" hint="optional">
                           <BrancheInput value={form.branche} onChange={(v) => set("branche", v)} />
                         </Field>
-                        <Field label="Was macht dich besonders?" hint="Was können nur du / dein Team?">
+                        <Field
+                          label="Alleinstellungsmerkmal / Fokus"
+                          hint="Was können nur du / dein Team?"
+                        >
                           <textarea
                             className={textareaCls}
                             value={form.besonders}
@@ -479,31 +423,25 @@ export default function Fragebogen() {
 
                     {step === 1 && (
                       <div>
-                        <Field label="Was ist das Hauptziel?" hint="Mehrere möglich">
+                        <Field label="Was ist das Hauptziel?" hint="Mehrere möglich, optional">
                           <ChipGroup options={GOALS} value={form.goals} onChange={(v) => set("goals", v)} />
-                          <textarea
-                            className={cx(textareaCls, "mt-3 min-h-[60px]")}
-                            value={form.goalsOther}
-                            onChange={(e) => set("goalsOther", e.target.value)}
-                            placeholder="Noch etwas? z.B. Lieferanten informieren, Stellenangebote zeigen, Events ankündigen …"
-                          />
                         </Field>
-                        <Field label="Was soll ein Besucher auf deiner Seite TUN?" hint="Der wichtigste Schritt">
-                          <input
-                            className={inputCls}
-                            value={form.cta}
-                            onChange={(e) => set("cta", e.target.value)}
-                            placeholder="z.B. Angebot anfragen, Termin buchen, Produkt kaufen, Anrufen …"
-                          />
+                        <Field label="Wer sind deine Kunden?" hint="optional">
+                          <RadioGroup options={KUNDTYP} value={form.kundtyp} onChange={(v) => set("kundtyp", v)} />
                         </Field>
-                        <Field label="Hast du eine bestehende Website?">
+                      </div>
+                    )}
+
+                    {step === 2 && (
+                      <div>
+                        <Field label="Hast du eine bestehende Website?" hint="optional">
                           <RadioGroup
                             options={EXISTING_WEB}
                             value={form.existingWeb}
                             onChange={(v) => set("existingWeb", v)}
                           />
                         </Field>
-                        <Field label="URL der alten Website" hint="(falls vorhanden)">
+                        <Field label="URL der alten Website" hint="falls vorhanden">
                           <input
                             type="url"
                             className={inputCls}
@@ -512,182 +450,11 @@ export default function Fragebogen() {
                             placeholder="https://www.meinewebsite.de"
                           />
                         </Field>
-                      </div>
-                    )}
-
-                    {step === 2 && (
-                      <div>
-                        <Field label="Wer sind deine idealen Kunden?">
-                          <textarea
-                            className={textareaCls}
-                            value={form.zielgruppe}
-                            onChange={(e) => set("zielgruppe", e.target.value)}
-                            placeholder="z.B. Paare zwischen 28–40, die heiraten wollen. Wohnen in und um München. Legen Wert auf stilvolle, authentische Fotos und sind bereit, dafür mehr auszugeben."
-                          />
-                        </Field>
-                        <Field label="Privat- oder Geschäftskunden?">
-                          <RadioGroup options={KUNDTYP} value={form.kundtyp} onChange={(v) => set("kundtyp", v)} />
-                        </Field>
-                        <Field label="Welches Problem löst du für deine Kunden?">
-                          <textarea
-                            className={textareaCls}
-                            value={form.problem}
-                            onChange={(e) => set("problem", e.target.value)}
-                            placeholder="z.B. Viele suchen stundenlang nach einem zuverlässigen Handwerker — bei uns bekommt man innerhalb von 24h ein Angebot."
-                          />
-                        </Field>
-                        <Field label="Wo sind deine Kunden aktiv?" hint="Mehrere möglich">
-                          <ChipGroup options={CHANNELS} value={form.channels} onChange={(v) => set("channels", v)} />
-                        </Field>
-                      </div>
-                    )}
-
-                    {step === 3 && (
-                      <div>
-                        <Field label="Welches Gefühl soll deine Website vermitteln?" hint="Mehrere möglich">
-                          <FeelingGrid value={form.feelings} onChange={(v) => set("feelings", v)} />
-                        </Field>
-                        <Field label="Hast du Wunschfarben oder Unternehmensfarben?">
-                          <div className="space-y-3">
-                            <ColorField
-                              label=""
-                              color={form.color1}
-                              hex={form.color1Hex}
-                              onColor={(v) => set("color1", v)}
-                              onHex={(v) => set("color1Hex", v)}
-                            />
-                            <ColorField
-                              label=""
-                              color={form.color2}
-                              hex={form.color2Hex}
-                              onColor={(v) => set("color2", v)}
-                              onHex={(v) => set("color2Hex", v)}
-                            />
-                          </div>
-                        </Field>
                         <Field
-                          label="Sollen die Farben kontrastieren oder harmonieren?"
-                          hint="z.B. Logo sticht hervor vs. alles im Einklang"
+                          label="Logo oder Material hochladen"
+                          hint={`optional, max. ${MAX_UPLOAD_MB} MB`}
                         >
-                          <RadioGroup
-                            options={COLOR_MODE}
-                            value={form.colorMode}
-                            onChange={(v) => set("colorMode", v)}
-                          />
-                        </Field>
-                        <Field label="Nenne 2–3 Websites, die dir gefallen" hint="Egal aus welcher Branche — und warum?">
-                          <textarea
-                            className={textareaCls}
-                            value={form.inspo}
-                            onChange={(e) => set("inspo", e.target.value)}
-                            placeholder={"z.B. apple.com — weil es so klar und aufgeräumt ist\nairbnb.com — wegen der großen Fotos und einfachen Navigation"}
-                          />
-                        </Field>
-                        <Field label="Gibt es etwas, das du auf keinen Fall möchtest?">
-                          <textarea
-                            className={cx(textareaCls, "min-h-[70px]")}
-                            value={form.noDesign}
-                            onChange={(e) => set("noDesign", e.target.value)}
-                            placeholder="z.B. keine dunklen Hintergründe, keine überladenen Animationen …"
-                          />
-                        </Field>
-                      </div>
-                    )}
-
-                    {step === 4 && (
-                      <div>
-                        <Field label="Welche Seiten brauchst du?" hint="Mehrere möglich">
-                          <ChipGroup options={PAGES} value={form.pages} onChange={(v) => set("pages", v)} />
-                        </Field>
-                        <Field label="Was hast du schon?">
-                          <ChipGroup options={HAVE} value={form.have} onChange={(v) => set("have", v)} />
-                        </Field>
-                        <Field label="In welchen Sprachen soll die Website sein?">
-                          <ChipGroup options={LANGS} value={form.langs} onChange={(v) => set("langs", v)} />
-                        </Field>
-                      </div>
-                    )}
-
-                    {step === 5 && (
-                      <div>
-                        <Field label="Welche Funktionen brauchst du?">
-                          <ChipGroup options={FEATURES} value={form.features} onChange={(v) => set("features", v)} />
-                        </Field>
-                        <Field label="Hast du schon eine Domain?">
-                          <RadioGroup options={DOMAIN} value={form.domain} onChange={(v) => set("domain", v)} />
-                        </Field>
-                        <Field label="Wunsch-Domain" hint="(falls du eine hast oder dir etwas vorstellst)">
-                          <input
-                            className={inputCls}
-                            value={form.domainWish}
-                            onChange={(e) => set("domainWish", e.target.value)}
-                            placeholder="z.B. www.meinbusiness.de"
-                          />
-                        </Field>
-                        <Field label="Gibt es Konkurrenten mit Website?" hint="Was machst du besser?">
-                          <textarea
-                            className={cx(textareaCls, "min-h-[70px]")}
-                            value={form.competitors}
-                            onChange={(e) => set("competitors", e.target.value)}
-                            placeholder="z.B. Firma A: gute Preise, aber keine Fotos. Mein Vorteil: …"
-                          />
-                        </Field>
-                      </div>
-                    )}
-
-                    {step === 6 && (
-                      <div>
-                        <Field label="Wann brauchst du die Website?">
-                          <RadioGroup options={TIMELINE} value={form.timeline} onChange={(v) => set("timeline", v)} />
-                        </Field>
-                        <Field label="Gibt es ein konkretes Datum oder einen Anlass?">
-                          <input
-                            className={inputCls}
-                            value={form.anlass}
-                            onChange={(e) => set("anlass", e.target.value)}
-                            placeholder="z.B. Eröffnung am 1. August, Messe im Oktober …"
-                          />
-                        </Field>
-                        <Field label="Möchtest du die Website selbst pflegen können?">
-                          <RadioGroup
-                            options={SELFMGMT}
-                            value={form.selfmgmt}
-                            onChange={(v) => set("selfmgmt", v)}
-                          />
-                        </Field>
-                        <Field label="Deine E-Mail-Adresse">
-                          <input
-                            type="email"
-                            className={inputCls}
-                            value={form.email}
-                            onChange={(e) => {
-                              set("email", e.target.value);
-                              if (emailError) setEmailError("");
-                            }}
-                            placeholder="deine@email.de"
-                            autoComplete="email"
-                          />
-                          {emailError && (
-                            <span className="mt-1.5 block text-xs text-[#ff9a9a]">{emailError}</span>
-                          )}
-                        </Field>
-                        <Field label="Deine Telefonnummer" hint="(optional)">
-                          <input
-                            type="tel"
-                            className={inputCls}
-                            value={form.phone}
-                            onChange={(e) => set("phone", e.target.value)}
-                            placeholder="+49 123 456789"
-                            autoComplete="tel"
-                          />
-                        </Field>
-                        <Field label="Sonst noch etwas?" hint="Ideen, Wünsche, Fragen — alles rein!">
-                          <textarea
-                            className={textareaCls}
-                            value={form.extras}
-                            onChange={(e) => set("extras", e.target.value)}
-                            placeholder="z.B. Ich habe schon Texte, brauche aber Hilfe mit Fotos."
-                          />
+                          <UploadField attachment={attachment} onChange={setAttachment} />
                         </Field>
                       </div>
                     )}
@@ -719,7 +486,8 @@ export default function Fragebogen() {
                 </div>
 
                 <p className="mt-6 text-center font-grotesk text-xs text-paper/50">
-                  Deine Angaben gehen direkt an Nicolas und werden nur für dieses Projekt genutzt.{" "}
+                  Ganz unverbindlich — jede Frage kann leer bleiben. Deine Angaben gehen direkt an
+                  Nicolas und werden nur für dieses Projekt genutzt.{" "}
                   <button
                     type="button"
                     onClick={() => navigate("/datenschutz")}
@@ -758,7 +526,8 @@ function SuccessPanel({ sendState }: { sendState: "pending" | "ok" | "error" }) 
       </motion.div>
       <h2 className="mt-6 max-w-sm font-display text-2xl font-extrabold text-paper">Vielen Dank!</h2>
       <p className="mt-3 max-w-sm text-pretty text-sm leading-relaxed text-paper/60">
-        Deine Antworten sind angekommen. Wir melden uns in Kürze bei dir — dann legen wir los.
+        Deine Antworten sind angekommen. Wir gehen sie vor unserem Gespräch schon durch — den Rest
+        klären wir gemeinsam im Termin.
       </p>
       {sendState === "ok" && (
         <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-nova-sky/20 bg-nova-sky/[0.06] px-4 py-1.5 text-xs text-nova-mist">

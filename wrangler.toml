@@ -12,3 +12,9 @@ not_found_handling = "single-page-application"
 [[kv_namespaces]]
 binding = "CONSENT_LOG"
 id = "7114e1d7cd194a02a30bed9fec511622"
+
+# Booking-Queue für die LeadWerk-Integration, siehe
+# functions/api/leadwerk-pending.ts und src/leadwerk-app.md (Memory).
+[[kv_namespaces]]
+binding = "LEADWERK_QUEUE"
+id = "eb9f8790b79c4431bf6fea1311cb5d2e"

@@ -5,12 +5,12 @@
  * Erklärung zu Workers vs. Pages Functions — dieses Projekt läuft als
  * Workers, der Aufruf passiert manuell aus worker/index.ts).
  *
- * Nimmt die Antworten aus dem Vorab-Fragebogen (/fragebogen, siehe
- * src/components/Fragebogen.tsx) entgegen und verschickt sie als eine
- * E-Mail über Brevo — einmal als lesbare Tabelle, einmal als fertiger
- * Textblock zum Einfügen in einen Bau-Prompt (Migration der alten
- * "KUNDENFEEDBACK-BLOCK"-Funktion aus dem ursprünglichen, separaten
- * Fragebogen).
+ * Nimmt die Antworten aus dem kurzen Vorab-Fragebogen (/fragebogen, siehe
+ * src/components/Fragebogen.tsx) entgegen und verschickt sie als E-Mail über
+ * Brevo — inklusive optional hochgeladenem Logo/Bild als Anhang.
+ *
+ * Der Fragebogen ist bewusst kurz: er ersetzt kein Gespräch, sondern gibt
+ * vorab ein grobes Bild. Alle Details werden im persönlichen Termin geklärt.
  *
  * ── Einmalig in Cloudflare einrichten ──────────────────────────────────────
  *   Nutzt dieselben Variablen wie /api/booking (BREVO_API_KEY, SENDER_EMAIL,
@@ -21,6 +21,12 @@
  *                        (Default dort: info@novastackstudio.de).
  * ───────────────────────────────────────────────────────────────────────────
  */
+
+interface FragebogenAttachment {
+  name: string;
+  type: string;
+  base64: string;
+}
 
 interface Env {
   BREVO_API_KEY: string;
@@ -41,14 +47,27 @@ const esc = (v: unknown) =>
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 
-const isEmail = (v: unknown) =>
-  typeof v === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-
 /** Array -> "a, b, c"; leer/undefined -> "—". */
 const line = (v: unknown): string => {
   const s = Array.isArray(v) ? v.join(", ") : String(v ?? "");
   return s.trim() || "—";
 };
+
+/** Grobe Validierung: nur Bilder/PDFs, max. 8 MB (roh, vor Base64-Aufblähung). */
+const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml", "application/pdf"];
+
+function isValidAttachment(a: unknown): a is FragebogenAttachment {
+  if (!a || typeof a !== "object") return false;
+  const att = a as Record<string, unknown>;
+  if (typeof att.name !== "string" || typeof att.type !== "string" || typeof att.base64 !== "string") {
+    return false;
+  }
+  if (!ALLOWED_ATTACHMENT_TYPES.includes(att.type)) return false;
+  // base64 length -> approx raw byte size
+  const approxBytes = (att.base64.length * 3) / 4;
+  return approxBytes > 0 && approxBytes <= MAX_ATTACHMENT_BYTES;
+}
 
 async function sendViaBrevo(
   env: Env,
@@ -57,8 +76,7 @@ async function sendViaBrevo(
     toName?: string;
     subject: string;
     html: string;
-    replyToEmail?: string;
-    replyToName?: string;
+    attachment?: FragebogenAttachment | null;
   },
 ) {
   const sender = env.SENDER_EMAIL || "info@novastackstudio.de";
@@ -68,8 +86,8 @@ async function sendViaBrevo(
     subject: msg.subject,
     htmlContent: msg.html,
   };
-  if (msg.replyToEmail) {
-    body.replyTo = { email: msg.replyToEmail, name: msg.replyToName || msg.replyToEmail };
+  if (msg.attachment) {
+    body.attachment = [{ content: msg.attachment.base64, name: msg.attachment.name }];
   }
 
   const res = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -98,58 +116,19 @@ function section(title: string, rows: [string, unknown][]): string {
   return `<h3 style="font-family:sans-serif;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#3a74cc;margin:22px 0 6px;">${esc(title)}</h3><table style="font-family:sans-serif;font-size:14px;border-collapse:collapse;width:100%;">${trs}</table>`;
 }
 
-/** Migriert die alte "KUNDENFEEDBACK-BLOCK"-Funktion — fertig zum Einfügen in einen Bau-Prompt. */
-function buildPromptBlock(d: Record<string, unknown>): string {
-  const goals = [line(d.goals) !== "—" ? line(d.goals) : "", line(d.goalsOther) !== "—" ? line(d.goalsOther) : ""]
-    .filter(Boolean)
-    .join("; ") || "—";
-
+/** Fertig zum Einfügen in einen Bau-Prompt. */
+function buildPromptBlock(d: Record<string, unknown>, hasAttachment: boolean): string {
   return `================================================================
 KUNDENFEEDBACK: ${line(d.name)}
 ================================================================
 
-UNTERNEHMEN
 - Name: ${line(d.name)}
-- Was sie machen: ${line(d.was)}
 - Branche: ${line(d.branche)}
-- Alleinstellungsmerkmal / USP: ${line(d.besonders)}
-
-WEBSITE-ZIELE
-- Ziele: ${goals}
-- Wichtigste Aktion der Besucher: ${line(d.cta)}
-- Bestehende Website: ${line(d.existingWeb)}${line(d.oldUrl) !== "—" ? "\n- Alte URL: " + line(d.oldUrl) : ""}
-
-ZIELGRUPPE
-- Ideale Kunden: ${line(d.zielgruppe)}
+- Alleinstellungsmerkmal / Fokus: ${line(d.besonders)}
+- Hauptziele: ${line(d.goals)}
 - Kundentyp: ${line(d.kundtyp)}
-- Problem das gelöst wird: ${line(d.problem)}
-- Aktive Kanäle: ${line(d.channels)}
-
-DESIGN & STIL
-- Gewünschte Stimmung: ${line(d.feelings)}
-- Hauptfarbe: ${line(d.color1Hex)}
-- Akzentfarbe: ${line(d.color2Hex)}
-- Farbverhältnis: ${line(d.colorMode)}
-- Inspirations-Websites: ${line(d.inspo)}
-- Design-No-Gos: ${line(d.noDesign)}
-
-INHALT & SEITEN
-- Benötigte Seiten: ${line(d.pages)}
-- Vorhandenes Material: ${line(d.have)}
-- Sprachen: ${line(d.langs)}
-
-FUNKTIONEN & TECHNIK
-- Gewünschte Funktionen: ${line(d.features)}
-- Domain vorhanden: ${line(d.domain)}
-- Wunsch-Domain: ${line(d.domainWish)}
-- Wettbewerber: ${line(d.competitors)}
-
-PROJEKTRAHMEN
-- Timeline: ${line(d.timeline)}
-- Anlass / Datum: ${line(d.anlass)}
-- Website selbst pflegen: ${line(d.selfmgmt)}
-- Kontakt: ${line(d.email)} / ${line(d.phone)}
-- Sonstiges: ${line(d.extras)}
+- Bestehende Website: ${line(d.existingWeb)}${line(d.oldUrl) !== "—" ? "\n- Alte URL: " + line(d.oldUrl) : ""}
+- Logo/Material hochgeladen: ${hasAttachment ? "Ja (siehe Anhang)" : "Nein"}
 
 ================================================================`;
 }
@@ -170,59 +149,34 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
 
   const to = env.FRAGEBOGEN_TO || env.BOOKING_TO || "info@novastackstudio.de";
   const name = line(d.name);
-  const email = typeof d.email === "string" ? d.email.trim() : "";
+
+  const attachment = isValidAttachment(d.attachment) ? d.attachment : null;
+  if (d.attachment && !attachment) {
+    return json({ ok: false, error: "Invalid attachment" }, 400);
+  }
 
   const html = `
     <h2 style="font-family:sans-serif;">Neuer Fragebogen: ${esc(name)}</h2>
+    <p style="font-family:sans-serif;font-size:12px;color:#888;margin:0 0 10px;">
+      Kurzform — Details werden im persönlichen Gespräch geklärt.
+    </p>
     ${section("Unternehmen", [
       ["Name", d.name],
-      ["Was sie machen", d.was],
       ["Branche", d.branche],
-      ["Alleinstellungsmerkmal", d.besonders],
+      ["Alleinstellungsmerkmal / Fokus", d.besonders],
     ])}
-    ${section("Ziele", [
+    ${section("Ziel & Kunden", [
       ["Hauptziele", d.goals],
-      ["Eigene Ziele", d.goalsOther],
-      ["Wichtigste Aktion", d.cta],
+      ["Kundentyp", d.kundtyp],
+    ])}
+    ${section("Website", [
       ["Bestehende Website", d.existingWeb],
       ["Alte URL", d.oldUrl],
-    ])}
-    ${section("Zielgruppe", [
-      ["Ideale Kunden", d.zielgruppe],
-      ["Kundentyp", d.kundtyp],
-      ["Problem", d.problem],
-      ["Aktive Kanäle", d.channels],
-    ])}
-    ${section("Design & Stil", [
-      ["Stimmung", d.feelings],
-      ["Hauptfarbe", d.color1Hex],
-      ["Akzentfarbe", d.color2Hex],
-      ["Farbverhältnis", d.colorMode],
-      ["Inspiration", d.inspo],
-      ["No-Gos", d.noDesign],
-    ])}
-    ${section("Inhalt & Seiten", [
-      ["Seiten", d.pages],
-      ["Vorhanden", d.have],
-      ["Sprachen", d.langs],
-    ])}
-    ${section("Extras & Technik", [
-      ["Funktionen", d.features],
-      ["Domain vorhanden", d.domain],
-      ["Wunsch-Domain", d.domainWish],
-      ["Wettbewerber", d.competitors],
-    ])}
-    ${section("Kontakt & Zeitplan", [
-      ["Timeline", d.timeline],
-      ["Anlass / Datum", d.anlass],
-      ["Selbst pflegen", d.selfmgmt],
-      ["E-Mail", d.email],
-      ["Telefon", d.phone],
-      ["Sonstiges", d.extras],
+      ["Logo/Material hochgeladen", attachment ? `Ja — ${attachment.name}` : "Nein"],
     ])}
     <hr style="margin:24px 0;border:none;border-top:1px solid #ddd;" />
     <p style="font-family:sans-serif;font-size:12px;color:#888;margin:0 0 6px;">Zum Einfügen in deinen Bau-Prompt:</p>
-    <pre style="font-family:monospace;font-size:12px;white-space:pre-wrap;background:#f5f5f5;color:#111;padding:14px;border-radius:8px;">${esc(buildPromptBlock(d))}</pre>
+    <pre style="font-family:monospace;font-size:12px;white-space:pre-wrap;background:#f5f5f5;color:#111;padding:14px;border-radius:8px;">${esc(buildPromptBlock(d, !!attachment))}</pre>
   `;
 
   try {
@@ -231,8 +185,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       toName: "NovaStack",
       subject: `Fragebogen: ${name}`,
       html,
-      replyToEmail: isEmail(email) ? email : undefined,
-      replyToName: name !== "—" ? name : undefined,
+      attachment,
     });
     return json({ ok: true });
   } catch (err) {

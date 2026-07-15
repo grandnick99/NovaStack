@@ -6,6 +6,16 @@ import { navigate } from "../lib/router";
 import { cx } from "../lib/cx";
 import { EASE } from "../lib/motion";
 
+/**
+ * Deliberately understated: a small bottom-left utility card, not a
+ * page-blocking marketing moment. No glowing CTA, no big display heading —
+ * this is a legal notice, not a hero. Kept compact per feedback that the
+ * previous full-width, big-heading version read as oversized and childish.
+ */
+
+const pillBtn =
+  "rounded-full px-3.5 py-1.5 font-grotesk text-[12.5px] font-medium transition-colors duration-150 whitespace-nowrap";
+
 function CategoryToggle({
   title,
   body,
@@ -22,13 +32,13 @@ function CategoryToggle({
   onToggle?: () => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-nova-sky/10 py-4 last:border-0">
+    <div className="flex items-start justify-between gap-4 border-b border-nova-sky/10 py-3.5 last:border-0">
       <div className="min-w-0">
-        <p className="font-grotesk text-sm font-medium text-paper">{title}</p>
-        <p className="mt-1 text-[13px] leading-relaxed text-paper/60">{body}</p>
+        <p className="font-grotesk text-[13px] font-medium text-paper">{title}</p>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-paper/55">{body}</p>
       </div>
       {disabled ? (
-        <span className="mt-0.5 flex-none font-grotesk text-[11px] uppercase tracking-label text-nova-sky/60">
+        <span className="mt-0.5 flex-none font-grotesk text-[10px] uppercase tracking-label text-nova-sky/55">
           {alwaysOnLabel}
         </span>
       ) : (
@@ -38,18 +48,16 @@ function CategoryToggle({
           aria-checked={checked}
           aria-label={title}
           onClick={onToggle}
-          className="relative mt-0.5 h-6 w-11 flex-none rounded-full border transition-colors duration-200"
+          className="relative mt-0.5 h-5 w-9 flex-none rounded-full border transition-colors duration-200"
           style={{
-            borderColor: checked ? "transparent" : "rgba(104,161,235,0.3)",
-            background: checked
-              ? "linear-gradient(180deg, #cfe0fb, #68a1eb)"
-              : "rgba(9,15,38,0.4)",
+            borderColor: checked ? "transparent" : "rgba(104,161,235,0.25)",
+            background: checked ? "rgba(104,161,235,0.9)" : "rgba(9,15,38,0.4)",
           }}
         >
           <span
             className={cx(
-              "absolute top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow transition-all duration-200",
-              checked ? "left-[22px]" : "left-0.5",
+              "absolute top-0.5 h-[14px] w-[14px] rounded-full bg-white shadow transition-all duration-200",
+              checked ? "left-[18px]" : "left-0.5",
             )}
           />
         </button>
@@ -76,19 +84,24 @@ export default function CookieBanner() {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[90] flex justify-center px-4 pb-4 sm:px-6 sm:pb-6" role="dialog" aria-modal="false" aria-label={c.bannerTitle}>
+    <div
+      className="fixed inset-x-4 bottom-4 z-[90] flex justify-center sm:inset-x-auto sm:bottom-5 sm:left-5 sm:justify-start"
+      role="dialog"
+      aria-modal="false"
+      aria-label={c.bannerTitle}
+    >
       <AnimatePresence mode="wait">
         {view === "banner" ? (
           <motion.div
             key="banner"
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24 }}
-            transition={{ duration: 0.4, ease: EASE }}
-            className="glass-lit w-full max-w-2xl rounded-slab p-6 shadow-slab md:p-7"
+            exit={{ opacity: 0, y: 14 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            className="w-full max-w-sm rounded-2xl border border-nova-sky/12 bg-nova-ink/90 p-4 shadow-[0_12px_36px_-16px_rgba(0,0,0,0.55)] backdrop-blur-md"
           >
-            <p className="font-display text-lg font-extrabold text-paper">{c.bannerTitle}</p>
-            <p className="mt-2 text-pretty text-sm leading-relaxed text-paper/65">
+            <p className="font-grotesk text-[13px] font-semibold text-paper">{c.bannerTitle}</p>
+            <p className="mt-1.5 text-pretty text-[12.5px] leading-relaxed text-paper/55">
               {c.bannerBody}{" "}
               <a
                 href="/datenschutz"
@@ -96,36 +109,48 @@ export default function CookieBanner() {
                   e.preventDefault();
                   navigate("/datenschutz");
                 }}
-                className="text-nova-sky underline underline-offset-2 hover:text-nova-mist"
+                className="text-nova-sky/90 underline underline-offset-2 hover:text-nova-mist"
               >
                 {c.privacyLinkLabel}
               </a>
             </p>
-            <div className="mt-5 flex flex-col-reverse gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
-              <button type="button" onClick={openDetails} className="btn-ghost flex-1 sm:flex-none">
-                {c.customize}
+            <div className="mt-3.5 flex flex-wrap items-center gap-x-1 gap-y-2">
+              <button
+                type="button"
+                onClick={acceptAll}
+                className={cx(pillBtn, "bg-nova-sky/90 text-ink-900 hover:bg-nova-sky")}
+              >
+                {c.acceptAll}
               </button>
-              <button type="button" onClick={rejectNonEssential} className="btn-ghost flex-1 sm:flex-none">
+              <button
+                type="button"
+                onClick={rejectNonEssential}
+                className={cx(pillBtn, "border border-nova-sky/15 text-paper/65 hover:border-nova-sky/35 hover:text-paper")}
+              >
                 {c.rejectNonEssential}
               </button>
-              <button type="button" onClick={acceptAll} className="btn-primary sheen-mask flex-1 sm:ml-auto sm:flex-none">
-                {c.acceptAll}
+              <button
+                type="button"
+                onClick={openDetails}
+                className={cx(pillBtn, "text-paper/45 underline underline-offset-2 hover:text-paper/75")}
+              >
+                {c.customize}
               </button>
             </div>
           </motion.div>
         ) : (
           <motion.div
             key="details"
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24 }}
-            transition={{ duration: 0.4, ease: EASE }}
-            className="glass-lit w-full max-w-2xl rounded-slab p-6 shadow-slab md:p-7"
+            exit={{ opacity: 0, y: 14 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            className="w-full max-w-sm rounded-2xl border border-nova-sky/12 bg-nova-ink/90 p-4 shadow-[0_12px_36px_-16px_rgba(0,0,0,0.55)] backdrop-blur-md"
           >
-            <p className="font-display text-lg font-extrabold text-paper">{c.panelTitle}</p>
-            <p className="mt-2 text-pretty text-sm leading-relaxed text-paper/65">{c.panelBody}</p>
+            <p className="font-grotesk text-[13px] font-semibold text-paper">{c.panelTitle}</p>
+            <p className="mt-1.5 text-pretty text-[12.5px] leading-relaxed text-paper/55">{c.panelBody}</p>
 
-            <div className="mt-4">
+            <div className="mt-2">
               <CategoryToggle
                 title={c.categories[0].title}
                 body={c.categories[0].body}
@@ -147,16 +172,20 @@ export default function CookieBanner() {
               />
             </div>
 
-            <div className="mt-5 flex flex-col-reverse gap-2.5 sm:flex-row sm:items-center">
-              <button type="button" onClick={() => setView("banner")} className="btn-ghost flex-1 sm:flex-none">
-                {c.back}
-              </button>
+            <div className="mt-3.5 flex items-center gap-x-1">
               <button
                 type="button"
                 onClick={() => savePreferences(draft)}
-                className="btn-primary sheen-mask flex-1 sm:ml-auto sm:flex-none"
+                className={cx(pillBtn, "bg-nova-sky/90 text-ink-900 hover:bg-nova-sky")}
               >
                 {c.save}
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("banner")}
+                className={cx(pillBtn, "text-paper/45 underline underline-offset-2 hover:text-paper/75")}
+              >
+                {c.back}
               </button>
             </div>
           </motion.div>

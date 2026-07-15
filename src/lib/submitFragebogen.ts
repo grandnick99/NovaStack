@@ -1,42 +1,26 @@
+export interface FragebogenAttachment {
+  name: string;
+  type: string;
+  /** Base64-encoded file content, no "data:...;base64," prefix. */
+  base64: string;
+}
+
 export interface FragebogenPayload {
   name: string;
-  was: string;
   branche: string;
   besonders: string;
   goals: string[];
-  goalsOther: string;
-  cta: string;
+  kundtyp: string;
   existingWeb: string;
   oldUrl: string;
-  zielgruppe: string;
-  kundtyp: string;
-  problem: string;
-  channels: string[];
-  feelings: string[];
-  color1Hex: string;
-  color2Hex: string;
-  colorMode: string;
-  inspo: string;
-  noDesign: string;
-  pages: string[];
-  have: string[];
-  langs: string[];
-  features: string[];
-  domain: string;
-  domainWish: string;
-  competitors: string;
-  timeline: string;
-  anlass: string;
-  selfmgmt: string;
-  email: string;
-  phone: string;
-  extras: string;
+  attachment: FragebogenAttachment | null;
   submittedAt: string;
 }
 
 /**
- * Sends the completed questionnaire to our Cloudflare Function
- * (functions/api/fragebogen.ts), which forwards it as an email via Brevo.
+ * Sends the completed (short) questionnaire to our Cloudflare Function
+ * (functions/api/fragebogen.ts), which forwards it as an email via Brevo —
+ * including the optional logo/file upload as an email attachment.
  * Same pattern as submitBooking.ts — same-origin "/api/fragebogen" by
  * default, only works on Cloudflare (deploy or `wrangler dev`), not on a
  * plain `vite dev` (no function runtime there).

@@ -34,6 +34,10 @@ interface Env {
   BOOKING_TO?: string;
   SENDER_EMAIL?: string;
   QUESTIONNAIRE_URL?: string;
+  /** See functions/api/leadwerk-pending.ts — optional booking->LeadWerk queue. */
+  LEADWERK_QUEUE?: {
+    put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+  };
 }
 
 const json = (data: unknown, status = 200) =>
@@ -109,13 +113,16 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     // ── Fragebogen-Anforderung: Link an den Interessenten mailen ───────────
     if (data.type === "questionnaire") {
       if (!isEmail(data.email)) return json({ ok: false, error: "Invalid email" }, 400);
-      const link = env.QUESTIONNAIRE_URL || "";
+      // Hardcoded fallback so the link always goes out even if the optional
+      // QUESTIONNAIRE_URL runtime variable was never set in Cloudflare — a
+      // missing env var used to silently fall back to a "we'll send it soon"
+      // placeholder that never actually arrived (bug: no follow-up email was
+      // ever scheduled to send the real link).
+      const link = env.QUESTIONNAIRE_URL || "https://novastackstudio.de/fragebogen";
       const html = `
         <p>Hallo ${esc(data.name) || "und willkommen"},</p>
         <p>vielen Dank für Ihr Interesse an einer Website mit NovaStack.
-        ${link
-          ? `Hier ist Ihr Vorab-Fragebogen: <a href="${esc(link)}">${esc(link)}</a></p>`
-          : `Wir senden Ihnen den Vorab-Fragebogen in Kürze zu.</p>`}
+        Hier ist Ihr Vorab-Fragebogen: <a href="${esc(link)}">${esc(link)}</a></p>
         <p>Herzliche Grüße<br/>Nicolas Grandezka · NovaStack</p>`;
       await sendViaBrevo(env, {
         to: String(data.email),
@@ -140,7 +147,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       ["Telefon", data.phone],
       ["Budget", data.budget],
       ["Wunschtermin", data.date],
-      ["Zeitfenster", data.slot],
+      ["Rückruf zwischen", data.callFrom && data.callTo ? `${data.callFrom} – ${data.callTo} Uhr` : ""],
       ["Fragebogen gewünscht", data.wantsQuestionnaire ? "ja" : "nein"],
       ["Sprache", data.lang],
     ];
@@ -167,6 +174,34 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       replyToEmail: String(data.email),
       replyToName: String(data.name || ""),
     });
+
+    // Also queue for LeadWerk (Nick's local sales app) to pick up on its next
+    // poll — see functions/api/leadwerk-pending.ts. Never let a queue failure
+    // fail the booking itself; the email above is the source of truth.
+    if (env.LEADWERK_QUEUE) {
+      try {
+        const id = crypto.randomUUID();
+        const entry = {
+          id,
+          name: data.name,
+          company: data.company,
+          email: data.email,
+          phone: data.phone,
+          services,
+          budget: data.budget,
+          date: data.date,
+          callFrom: data.callFrom,
+          callTo: data.callTo,
+          message,
+          submittedAt: new Date().toISOString(),
+        };
+        await env.LEADWERK_QUEUE.put(`booking:${id}`, JSON.stringify(entry), {
+          expirationTtl: 60 * 60 * 24 * 14,
+        });
+      } catch {
+        /* swallow: LeadWerk import is a convenience, not critical path */
+      }
+    }
 
     return json({ ok: true });
   } catch (err) {

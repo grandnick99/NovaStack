@@ -257,16 +257,17 @@ function Privacy() {
         jederzeit widerrufen können. Der Versand erfolgt über den in Abschnitt 6 genannten Dienstleister.
       </P>
       <P>
-        <strong>Ausfüllen des Fragebogens:</strong> Wenn Sie den unter{" "}
+        <strong>Ausfüllen des Fragebogens:</strong> Der Fragebogen unter{" "}
         <a href="/fragebogen" className="text-nova-sky underline underline-offset-2 hover:text-nova-mist">
           novastackstudio.de/fragebogen
         </a>{" "}
-        erreichbaren Fragebogen ausfüllen und absenden, verarbeiten wir die dort gemachten Angaben (u. a. Name,
-        Kontaktdaten, Angaben zu Ihrem Unternehmen, Ihrer Zielgruppe, Ihren Gestaltungswünschen und dem
-        Projektrahmen) ausschließlich zur Vorbereitung und Umsetzung Ihres Website-Projekts. Rechtsgrundlage ist
-        Art. 6 Abs. 1 lit. b DSGVO (vorvertragliche Maßnahmen). Der Versand an uns erfolgt technisch ebenfalls über
-        unsere Hosting-Infrastruktur und den in Abschnitt 6 genannten Dienstleister Brevo. Die Angaben werden nicht
-        an Dritte weitergegeben und ausschließlich für das angefragte Projekt genutzt.
+        ist bewusst kurz gehalten und komplett unverbindlich — jede Frage kann leer bleiben. Wenn Sie ihn
+        ausfüllen und absenden, verarbeiten wir die dort gemachten Angaben (u. a. Name, Branche, Angaben zu
+        Ihrem Unternehmen und Ihren Zielen sowie ein optional hochgeladenes Logo oder anderes Material)
+        ausschließlich zur Vorbereitung und Umsetzung Ihres Website-Projekts. Rechtsgrundlage ist Art. 6 Abs. 1
+        lit. b DSGVO (vorvertragliche Maßnahmen). Der Versand an uns erfolgt technisch ebenfalls über unsere
+        Hosting-Infrastruktur und den in Abschnitt 6 genannten Dienstleister Brevo. Die Angaben werden nicht an
+        Dritte weitergegeben und ausschließlich für das angefragte Projekt genutzt.
       </P>
 
       <H2>8. Web-Analyse: Google Analytics</H2>

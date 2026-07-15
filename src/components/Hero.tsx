@@ -75,8 +75,8 @@ export default function Hero() {
           className="mb-7 inline-flex w-fit items-center gap-2.5 rounded-full border border-nova-sky/15 bg-nova-sky/[0.05] px-4 py-1.5"
         >
           <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-nova-sky/60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-nova-sky" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#34d399]/60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-[#34d399] shadow-[0_0_6px_1px_rgba(52,211,153,0.8)]" />
           </span>
           <span className="label">{t.hero.eyebrow}</span>
         </motion.div>
